@@ -1,32 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-
-function Home() {
-  return <div>Home</div>
-}
-
-function JsonFormatter() {
-  return <div>JsonFormatter</div>
-}
-
-function Base64() {
-  return <div>Base64</div>
-}
-
-function UrlEncoder() {
-  return <div>UrlEncoder</div>
-}
-
-function UuidGenerator() {
-  return <div>UuidGenerator</div>
-}
-
-function TimestampConverter() {
-  return <div>TimestampConverter</div>
-}
-
-function ColorConverter() {
-  return <div>ColorConverter</div>
-}
+import Home from './pages/Home'
+import JsonFormatter from './pages/JsonFormatter'
+import Base64 from './pages/Base64'
+import UrlEncoder from './pages/UrlEncoder'
+import UuidGenerator from './pages/UuidGenerator'
+import TimestampConverter from './pages/TimestampConverter'
+import ColorConverter from './pages/ColorConverter'
 
 export default function App() {
   return (
