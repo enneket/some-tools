@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Header from '../components/Header'
 import ToolLayout from '../components/ToolLayout'
 
 export default function TimestampConverter() {
@@ -11,7 +10,7 @@ export default function TimestampConverter() {
       const res = await fetch('/api/convert/timestamp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timestamp: parseInt(input, 10) }),
+        body: JSON.stringify({ timestamp: parseInt(input, 10), to: 'date' }),
       })
       const data = await res.json()
       setOutput(data.result || data.error || '')
@@ -21,9 +20,7 @@ export default function TimestampConverter() {
   }
 
   return (
-    <div>
-      <Header />
-      <ToolLayout title="时间戳转换" description="时间戳与日期时间互转">
+    <ToolLayout title="时间戳转换" description="时间戳与日期时间互转">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <input
             type="number"
@@ -45,6 +42,5 @@ export default function TimestampConverter() {
           )}
         </div>
       </ToolLayout>
-    </div>
   )
 }

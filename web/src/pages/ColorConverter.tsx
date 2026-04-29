@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Header from '../components/Header'
 import ToolLayout from '../components/ToolLayout'
 
 export default function ColorConverter() {
@@ -12,7 +11,7 @@ export default function ColorConverter() {
       const res = await fetch('/api/convert/color', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: input, mode }),
+        body: JSON.stringify({ input, from: mode === 'hex2rgb' ? 'hex' : 'rgb', to: mode === 'hex2rgb' ? 'rgb' : 'hex' }),
       })
       const data = await res.json()
       setOutput(data.result || data.error || '')
@@ -22,9 +21,7 @@ export default function ColorConverter() {
   }
 
   return (
-    <div>
-      <Header />
-      <ToolLayout title="颜色转换" description="HEX 与 RGB 颜色值互转">
+    <ToolLayout title="颜色转换" description="HEX 与 RGB 颜色值互转">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
@@ -60,6 +57,5 @@ export default function ColorConverter() {
           )}
         </div>
       </ToolLayout>
-    </div>
   )
 }

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Header from '../components/Header'
 import ToolLayout from '../components/ToolLayout'
 
 export default function UrlEncoder() {
@@ -12,7 +11,7 @@ export default function UrlEncoder() {
       const res = await fetch('/api/encode/url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: input, mode }),
+        body: JSON.stringify({ input, action: mode }),
       })
       const data = await res.json()
       setOutput(data.result || data.error || '')
@@ -22,9 +21,7 @@ export default function UrlEncoder() {
   }
 
   return (
-    <div>
-      <Header />
-      <ToolLayout title="URL 编解码" description="URL 编码和解码">
+    <ToolLayout title="URL 编解码" description="URL 编码和解码">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button
@@ -58,6 +55,5 @@ export default function UrlEncoder() {
           )}
         </div>
       </ToolLayout>
-    </div>
   )
 }

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Header from '../components/Header'
 import ToolLayout from '../components/ToolLayout'
 
 export default function JsonFormatter() {
@@ -11,7 +10,7 @@ export default function JsonFormatter() {
       const res = await fetch('/api/format/json', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: input }),
+        body: JSON.stringify({ input }),
       })
       const data = await res.json()
       setOutput(data.result || data.error || '')
@@ -21,9 +20,7 @@ export default function JsonFormatter() {
   }
 
   return (
-    <div>
-      <Header />
-      <ToolLayout title="JSON 格式化" description="格式化、压缩、验证 JSON">
+    <ToolLayout title="JSON 格式化" description="格式化、压缩、验证 JSON">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <textarea
             value={input}
@@ -43,6 +40,5 @@ export default function JsonFormatter() {
           )}
         </div>
       </ToolLayout>
-    </div>
   )
 }
