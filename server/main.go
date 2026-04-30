@@ -32,6 +32,13 @@ func main() {
 			{"name": "markdown", "endpoint": "", "method": "", "description": "Preview Markdown rendering"},
 			{"name": "diff", "endpoint": "", "method": "", "description": "Compare two texts"},
 			{"name": "qrcode", "endpoint": "", "method": "", "description": "Generate QR code from text"},
+			{"name": "cron", "endpoint": "", "method": "", "description": "Parse Cron expression"},
+			{"name": "html-entity", "endpoint": "", "method": "", "description": "HTML entity encode/decode"},
+			{"name": "unicode", "endpoint": "", "method": "", "description": "Unicode encode/decode"},
+			{"name": "base", "endpoint": "", "method": "", "description": "Number base conversion"},
+			{"name": "wordcount", "endpoint": "", "method": "", "description": "Count words and characters"},
+			{"name": "img2base64", "endpoint": "", "method": "", "description": "Convert image to Base64"},
+			{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"tools": tools,

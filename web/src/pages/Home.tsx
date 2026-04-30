@@ -23,6 +23,13 @@ const CATEGORY_MAP: Record<string, string> = {
   'regex': '文本',
   'markdown': '文本',
   'diff': '文本',
+  'cron': '转换器',
+  'html-entity': '编解码',
+  'unicode': '编解码',
+  'base': '转换器',
+  'wordcount': '文本',
+  'img2base64': '生成器',
+  'httpstatus': '文本',
 }
 
 const ROUTE_MAP: Record<string, string> = {
@@ -39,6 +46,13 @@ const ROUTE_MAP: Record<string, string> = {
   'markdown': 'markdown-preview',
   'diff': 'text-diff',
   'qrcode': 'qrcode-generator',
+  'cron': 'cron-parser',
+  'html-entity': 'html-entity',
+  'unicode': 'unicode-converter',
+  'base': 'base-converter',
+  'wordcount': 'word-counter',
+  'img2base64': 'image-to-base64',
+  'httpstatus': 'http-status-codes',
 }
 
 const NAME_MAP: Record<string, string> = {
@@ -55,6 +69,13 @@ const NAME_MAP: Record<string, string> = {
   'markdown': 'Markdown 预览',
   'diff': '文本对比',
   'qrcode': '二维码生成',
+  'cron': 'Cron 解析',
+  'html-entity': 'HTML 实体',
+  'unicode': 'Unicode 编解码',
+  'base': '进制转换',
+  'wordcount': '字数统计',
+  'img2base64': '图片转 Base64',
+  'httpstatus': 'HTTP 状态码',
 }
 
 const DESC_MAP: Record<string, string> = {
@@ -71,6 +92,13 @@ const DESC_MAP: Record<string, string> = {
   'markdown': '实时预览 Markdown 渲染',
   'diff': '比较两段文本的差异',
   'qrcode': '文本或链接转二维码',
+  'cron': '解析 Cron 表达式，查看执行计划',
+  'html-entity': 'HTML 特殊字符编码和解码',
+  'unicode': 'Unicode 字符编码和解码',
+  'base': '二进制、八进制、十进制、十六进制互转',
+  'wordcount': '统计字符数、词数、行数、字节数',
+  'img2base64': '将图片转换为 Base64 编码',
+  'httpstatus': '快速查询 HTTP 状态码含义',
 }
 
 const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本']

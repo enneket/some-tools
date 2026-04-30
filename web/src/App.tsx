@@ -13,6 +13,13 @@ import RegexTester from './pages/RegexTester'
 import MarkdownPreview from './pages/MarkdownPreview'
 import TextDiff from './pages/TextDiff'
 import QrCodeGenerator from './pages/QrCodeGenerator'
+import CronParser from './pages/CronParser'
+import HtmlEntity from './pages/HtmlEntity'
+import UnicodeConverter from './pages/UnicodeConverter'
+import BaseConverter from './pages/BaseConverter'
+import WordCounter from './pages/WordCounter'
+import ImageToBase64 from './pages/ImageToBase64'
+import HttpStatusCodes from './pages/HttpStatusCodes'
 
 export default function App() {
   return (
@@ -32,6 +39,13 @@ export default function App() {
         <Route path="/tools/markdown-preview" element={<MarkdownPreview />} />
         <Route path="/tools/text-diff" element={<TextDiff />} />
         <Route path="/tools/qrcode-generator" element={<QrCodeGenerator />} />
+        <Route path="/tools/cron-parser" element={<CronParser />} />
+        <Route path="/tools/html-entity" element={<HtmlEntity />} />
+        <Route path="/tools/unicode-converter" element={<UnicodeConverter />} />
+        <Route path="/tools/base-converter" element={<BaseConverter />} />
+        <Route path="/tools/word-counter" element={<WordCounter />} />
+        <Route path="/tools/image-to-base64" element={<ImageToBase64 />} />
+        <Route path="/tools/http-status-codes" element={<HttpStatusCodes />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
