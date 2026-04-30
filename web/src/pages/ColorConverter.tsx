@@ -14,7 +14,7 @@ export default function ColorConverter() {
         body: JSON.stringify({ input, from: mode === 'hex2rgb' ? 'hex' : 'rgb', to: mode === 'hex2rgb' ? 'rgb' : 'hex' }),
       })
       const data = await res.json()
-      setOutput(data.result || data.error || '')
+      setOutput(data.output || data.error || '')
     } catch (err) {
       setOutput('Error: ' + (err as Error).message)
     }

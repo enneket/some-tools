@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import Header from '../components/Header'
 import ToolLayout from '../components/ToolLayout'
 
 export default function UuidGenerator() {
@@ -9,16 +8,14 @@ export default function UuidGenerator() {
     try {
       const res = await fetch('/api/generate/uuid', { method: 'POST' })
       const data = await res.json()
-      setUuid(data.result || data.error || '')
+      setUuid(data.output || data.error || '')
     } catch (err) {
       setUuid('Error: ' + (err as Error).message)
     }
   }
 
   return (
-    <div>
-      <Header />
-      <ToolLayout title="UUID 生成" description="生成随机 UUID">
+    <ToolLayout title="UUID 生成" description="生成随机 UUID">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <button onClick={handleGenerate} style={{ padding: '12px 24px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-start' }}>
             生成 UUID
@@ -32,7 +29,6 @@ export default function UuidGenerator() {
             />
           )}
         </div>
-      </ToolLayout>
-    </div>
+    </ToolLayout>
   )
 }

@@ -9,7 +9,71 @@ interface Tool {
   category: string
 }
 
-const CATEGORIES = ['全部', '编解码', '生成器', '转换器']
+const CATEGORY_MAP: Record<string, string> = {
+  'json': '编解码',
+  'base64': '编解码',
+  'url': '编解码',
+  'hash': '编解码',
+  'jwt': '编解码',
+  'uuid': '生成器',
+  'password': '生成器',
+  'qrcode': '生成器',
+  'timestamp': '转换器',
+  'color': '转换器',
+  'regex': '文本',
+  'markdown': '文本',
+  'diff': '文本',
+}
+
+const ROUTE_MAP: Record<string, string> = {
+  'json': 'json-formatter',
+  'base64': 'base64',
+  'url': 'url-encoder',
+  'uuid': 'uuid-generator',
+  'timestamp': 'timestamp-converter',
+  'color': 'color-converter',
+  'hash': 'hash-calculator',
+  'jwt': 'jwt-decoder',
+  'password': 'password-generator',
+  'regex': 'regex-tester',
+  'markdown': 'markdown-preview',
+  'diff': 'text-diff',
+  'qrcode': 'qrcode-generator',
+}
+
+const NAME_MAP: Record<string, string> = {
+  'json': 'JSON 格式化',
+  'base64': 'Base64 编解码',
+  'url': 'URL 编解码',
+  'uuid': 'UUID 生成',
+  'timestamp': '时间戳转换',
+  'color': '颜色转换',
+  'hash': 'Hash 计算',
+  'jwt': 'JWT 解析',
+  'password': '密码生成器',
+  'regex': '正则测试',
+  'markdown': 'Markdown 预览',
+  'diff': '文本对比',
+  'qrcode': '二维码生成',
+}
+
+const DESC_MAP: Record<string, string> = {
+  'json': '格式化、压缩、验证 JSON 数据',
+  'base64': 'Base64 编码和解码',
+  'url': 'URL 编码和解码',
+  'uuid': '生成随机 UUID',
+  'timestamp': '时间戳与日期时间互转',
+  'color': 'HEX 与 RGB 颜色值互转',
+  'hash': '计算 MD5/SHA1/SHA256/SHA512 摘要',
+  'jwt': '解码 JWT Token',
+  'password': '生成安全随机密码',
+  'regex': '测试正则表达式匹配',
+  'markdown': '实时预览 Markdown 渲染',
+  'diff': '比较两段文本的差异',
+  'qrcode': '文本或链接转二维码',
+}
+
+const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本']
 
 export default function Home() {
   const [tools, setTools] = useState<Tool[]>([])
@@ -19,7 +83,15 @@ export default function Home() {
   useEffect(() => {
     fetch('/api/tools')
       .then(res => res.json())
-      .then(data => setTools(data))
+      .then(data => {
+        const mapped = (data.tools || []).map((t: { name: string; description: string; endpoint: string }) => ({
+          id: ROUTE_MAP[t.name] || t.name,
+          name: NAME_MAP[t.name] || t.name,
+          description: DESC_MAP[t.name] || t.description,
+          category: CATEGORY_MAP[t.name] || '其他',
+        }))
+        setTools(mapped)
+      })
       .catch(console.error)
   }, [])
 
@@ -48,7 +120,7 @@ export default function Home() {
             }}
           />
         </div>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', flexWrap: 'wrap' }}>
           {CATEGORIES.map(cat => (
             <button
               key={cat}

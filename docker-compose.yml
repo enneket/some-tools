@@ -1,14 +1,7 @@
-version: '3.8'
 services:
-  web:
+  app:
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: Dockerfile
     ports:
-      - "3000:3000"
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile.server
-    ports:
-      - "8080:8080"
+      - "5561:8080"

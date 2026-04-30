@@ -14,7 +14,7 @@ export default function UrlEncoder() {
         body: JSON.stringify({ input, action: mode }),
       })
       const data = await res.json()
-      setOutput(data.result || data.error || '')
+      setOutput(data.output || data.error || '')
     } catch (err) {
       setOutput('Error: ' + (err as Error).message)
     }

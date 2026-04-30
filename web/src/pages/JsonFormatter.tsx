@@ -13,7 +13,7 @@ export default function JsonFormatter() {
         body: JSON.stringify({ input }),
       })
       const data = await res.json()
-      setOutput(data.result || data.error || '')
+      setOutput(data.output || data.error || '')
     } catch (err) {
       setOutput('Error: ' + (err as Error).message)
     }
