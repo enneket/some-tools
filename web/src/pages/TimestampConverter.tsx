@@ -5,6 +5,7 @@ export default function TimestampConverter() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
   const [mode, setMode] = useState<'to-date' | 'to-timestamp'>('to-date')
+  const [timezone, setTimezone] = useState('Asia/Shanghai')
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -12,16 +13,7 @@ export default function TimestampConverter() {
     return () => clearInterval(timer)
   }, [])
 
-  const currentDate = new Date(now)
-  const formattedDate = [
-    currentDate.getFullYear(),
-    String(currentDate.getMonth() + 1).padStart(2, '0'),
-    String(currentDate.getDate()).padStart(2, '0'),
-  ].join('-') + ' ' + [
-    String(currentDate.getHours()).padStart(2, '0'),
-    String(currentDate.getMinutes()).padStart(2, '0'),
-    String(currentDate.getSeconds()).padStart(2, '0'),
-  ].join(':')
+  const formattedDate = new Date(now).toLocaleString('sv-SE', { timeZone: timezone })
   const currentTimestamp = Math.floor(now / 1000)
 
   const handleConvert = async () => {
@@ -29,7 +21,7 @@ export default function TimestampConverter() {
       const res = await fetch('/api/convert/timestamp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input: mode === 'to-date' ? input : input.trim(), to: mode === 'to-date' ? 'date' : 'timestamp' }),
+        body: JSON.stringify({ input: mode === 'to-date' ? input : input.trim(), to: mode === 'to-date' ? 'date' : 'timestamp', timezone }),
       })
       const data = await res.json()
       setOutput(data.output || data.error || '')
@@ -57,6 +49,30 @@ export default function TimestampConverter() {
           <div>
             <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>当前时间戳</div>
             <div style={{ fontSize: '18px', fontFamily: 'monospace', fontWeight: 600 }}>{currentTimestamp}</div>
+          </div>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#666', whiteSpace: 'nowrap' }}>时区</span>
+            <select
+              value={timezone}
+              onChange={e => setTimezone(e.target.value)}
+              style={{
+                padding: '4px 8px',
+                fontSize: '13px',
+                border: '1px solid #e5e5e5',
+                borderRadius: '6px',
+                background: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              <option value="Asia/Shanghai">上海 (UTC+8)</option>
+              <option value="Asia/Tokyo">东京 (UTC+9)</option>
+              <option value="America/New_York">纽约 (UTC-5/-4)</option>
+              <option value="America/Los_Angeles">洛杉矶 (UTC-8/-7)</option>
+              <option value="Europe/London">伦敦 (UTC+0/+1)</option>
+              <option value="Europe/Berlin">柏林 (UTC+1/+2)</option>
+              <option value="Australia/Sydney">悉尼 (UTC+10/+11)</option>
+              <option value="UTC">UTC (UTC+0)</option>
+            </select>
           </div>
         </div>
 

@@ -19,7 +19,7 @@ RUN go build -o server .
 
 # Final stage
 FROM alpine
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /app/server .
 COPY --from=frontend /app/dist ./dist

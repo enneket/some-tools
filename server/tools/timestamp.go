@@ -14,17 +14,24 @@ func HandleTimestamp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Input string `json:"input"`
-		To    string `json:"to"`
+		Input    string `json:"input"`
+		To       string `json:"to"`
+		Timezone string `json:"timezone"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
+	loc := time.Local
+	if req.Timezone != "" {
+		if l, err := time.LoadLocation(req.Timezone); err == nil {
+			loc = l
+		}
+	}
+
 	switch req.To {
 	case "date":
-		// 时间戳 → 日期
 		input := strings.TrimSpace(req.Input)
 		ts, err := strconv.ParseInt(input, 10, 64)
 		if err != nil {
@@ -32,19 +39,17 @@ func HandleTimestamp(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if ts > 9999999999 {
-			// 毫秒级转秒级
 			ts = ts / 1000
 		}
-		t := time.Unix(ts, 0)
+		t := time.Unix(ts, 0).In(loc)
 		json.NewEncoder(w).Encode(map[string]string{"output": t.Format("2006-01-02 15:04:05")})
 
 	case "timestamp":
-		// 日期 → 时间戳
 		input := strings.TrimSpace(req.Input)
 		if input == "" {
-			input = time.Now().Format("2006-01-02 15:04:05")
+			input = time.Now().In(loc).Format("2006-01-02 15:04:05")
 		}
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", input, time.Local)
+		t, err := time.ParseInLocation("2006-01-02 15:04:05", input, loc)
 		if err != nil {
 			http.Error(w, "Invalid date format, use '2006-01-02 15:04:05'", http.StatusBadRequest)
 			return
