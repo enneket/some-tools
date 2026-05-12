@@ -4,6 +4,13 @@ import ToolLayout from '../components/ToolLayout'
 export default function JsonFormatter() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(output)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const handleFormat = async () => {
     try {
@@ -32,11 +39,23 @@ export default function JsonFormatter() {
             格式化
           </button>
           {output && (
-            <textarea
-              value={output}
-              readOnly
-              style={{ width: '100%', height: '200px', padding: '12px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', resize: 'vertical', fontFamily: 'monospace', background: '#f9f9f9' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={handleCopy}
+                style={{
+                  position: 'absolute', top: '8px', right: '8px', padding: '6px 14px',
+                  background: copied ? '#22c55e' : '#333', color: '#fff', border: 'none',
+                  borderRadius: '6px', cursor: 'pointer', fontSize: '13px', zIndex: 1,
+                }}
+              >
+                {copied ? '已复制' : '复制'}
+              </button>
+              <textarea
+                value={output}
+                readOnly
+                style={{ width: '100%', height: '200px', padding: '12px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', resize: 'vertical', fontFamily: 'monospace', background: '#f9f9f9' }}
+              />
+            </div>
           )}
         </div>
       </ToolLayout>
