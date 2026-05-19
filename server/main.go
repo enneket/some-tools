@@ -38,6 +38,7 @@ func main() {
 			{"name": "base", "endpoint": "", "method": "", "description": "Number base conversion"},
 			{"name": "wordcount", "endpoint": "", "method": "", "description": "Count words and characters"},
 			{"name": "img2base64", "endpoint": "", "method": "", "description": "Convert image to Base64"},
+				{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
 			{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{

@@ -29,6 +29,7 @@ const CATEGORY_MAP: Record<string, string> = {
   'base': '转换器',
   'wordcount': '文本',
   'img2base64': '生成器',
+  'base64toimg': '生成器',
   'httpstatus': '文本',
 }
 
@@ -52,6 +53,7 @@ const ROUTE_MAP: Record<string, string> = {
   'base': 'base-converter',
   'wordcount': 'word-counter',
   'img2base64': 'image-to-base64',
+  'base64toimg': 'base64-to-image',
   'httpstatus': 'http-status-codes',
 }
 
@@ -75,6 +77,7 @@ const NAME_MAP: Record<string, string> = {
   'base': '进制转换',
   'wordcount': '字数统计',
   'img2base64': '图片转 Base64',
+  'base64toimg': 'Base64 转图片',
   'httpstatus': 'HTTP 状态码',
 }
 
@@ -98,6 +101,7 @@ const DESC_MAP: Record<string, string> = {
   'base': '二进制、八进制、十进制、十六进制互转',
   'wordcount': '统计字符数、词数、行数、字节数',
   'img2base64': '将图片转换为 Base64 编码',
+  'base64toimg': '将 Base64 编码转换为图片显示',
   'httpstatus': '快速查询 HTTP 状态码含义',
 }
 
