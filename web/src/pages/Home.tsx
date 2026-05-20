@@ -31,6 +31,7 @@ const CATEGORY_MAP: Record<string, string> = {
   'img2base64': '生成器',
   'base64toimg': '生成器',
   'httpstatus': '文本',
+  'sql': '文本',
 }
 
 const ROUTE_MAP: Record<string, string> = {
@@ -55,6 +56,7 @@ const ROUTE_MAP: Record<string, string> = {
   'img2base64': 'image-to-base64',
   'base64toimg': 'base64-to-image',
   'httpstatus': 'http-status-codes',
+  'sql': 'sql-formatter',
 }
 
 const NAME_MAP: Record<string, string> = {
@@ -79,6 +81,7 @@ const NAME_MAP: Record<string, string> = {
   'img2base64': '图片转 Base64',
   'base64toimg': 'Base64 转图片',
   'httpstatus': 'HTTP 状态码',
+  'sql': 'SQL 格式化',
 }
 
 const DESC_MAP: Record<string, string> = {
@@ -103,6 +106,7 @@ const DESC_MAP: Record<string, string> = {
   'img2base64': '将图片转换为 Base64 编码',
   'base64toimg': '将 Base64 编码转换为图片显示',
   'httpstatus': '快速查询 HTTP 状态码含义',
+  'sql': '规范化并格式化 SQL 语句',
 }
 
 const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本']

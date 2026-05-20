@@ -40,6 +40,7 @@ func main() {
 			{"name": "img2base64", "endpoint": "", "method": "", "description": "Convert image to Base64"},
 				{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
 			{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
+		{"name": "sql", "endpoint": "/api/format/sql", "method": "POST", "description": "Format SQL query"},
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"tools": tools,
@@ -55,6 +56,7 @@ func main() {
 	http.HandleFunc("/api/hash", tools.HandleHash)
 	http.HandleFunc("/api/jwt/decode", tools.HandleJWT)
 	http.HandleFunc("/api/password/generate", tools.HandlePassword)
+	http.HandleFunc("/api/format/sql", tools.HandleSQL)
 
 	// Serve static files from disk
 	distDir := filepath.Join(".", "dist")
