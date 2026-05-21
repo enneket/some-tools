@@ -1,0 +1,110 @@
+{
+  "timestamp": "2026-05-19T01:51:24.488Z",
+  "mode": "headless",
+  "workerType": "testgaps",
+  "model": "sonnet",
+  "durationMs": 114250,
+  "executionId": "testgaps_1779155370238_k9mg51",
+  "success": true,
+  "findings": {
+    "sections": [
+      {
+        "title": "Test Coverage Analysis Report",
+        "content": "\n**Project:** some-tools (Go backend + React SPA)\n**Test Coverage: 0%** — No test files found\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "Backend: 9 Go Handlers, All Untested",
+        "content": "\n| Handler | File | LoC | Functions |\n|---------|------|-----|-----------|\n| HandleJSON | json.go | 32 | 1 |\n| HandleBase64 | base64.go | 38 | 1 |\n| HandleURL | url.go | 38 | 1 |\n| HandleColor | color.go | 78 | 1 |\n| HandleUUID | uuid.go | 17 | 1 |\n| HandleHash | hash.go | 58 | 1 |\n| HandleJWT | jwt.go | 68 | 2 (HandleJWT + unexported decodeJWTPart) |\n| HandlePassword | password.go | 62 | 1 |\n| HandleTimestamp | timestamp.go | 62 | 1 |\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Critical Gaps",
+        "content": "\n",
+        "level": 3
+      },
+      {
+        "title": "1. **HandleHash** — hash.go",
+        "content": "**Missing:**\n- `\"all\"` algorithm returns all 4 hashes\n- Invalid algorithm error\n- Empty input handling\n\n```go\n// Test skeleton\nfunc TestHandleHash_All(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"hello\",\"alg\":\"all\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/hash\", body)\n    w := httptest.NewRecorder()\n    HandleHash(w, req)\n    if w.Code != http.StatusOK { t.Errorf(\"expected 200, got %d\", w.Code) }\n    var resp map[string]string\n    json.Unmarshal(w.Body.Bytes(), &resp)\n    output := resp[\"output\"]\n    if !strings.Contains(output, \"MD5:\") || !strings.Contains(output, \"SHA512:\") {\n        t.Error(\"expected all hash algorithms in output\")\n    }\n}\n\nfunc TestHandleHash_InvalidAlg(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"test\",\"alg\":\"invalid\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/hash\", body)\n    w := httptest.NewRecorder()\n    HandleHash(w, req)\n    if w.Code != http.StatusBadRequest { t.Errorf(\"expected 400, got %d\", w.Code) }\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "2. **HandleBase64** — base64.go",
+        "content": "**Missing:**\n- Invalid base64 decode errors (e.g., `\"not-valid-base64!!!\"`)\n\n```go\nfunc TestHandleBase64_DecodeInvalid(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"!!!invalid-base64\",\"action\":\"decode\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/encode/base64\", body)\n    w := httptest.NewRecorder()\n    HandleBase64(w, req)\n    if w.Code != http.StatusBadRequest { t.Errorf(\"expected 400, got %d\", w.Code) }\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "3. **HandleURL** — url.go",
+        "content": "**Missing:**\n- Decode failure on invalid `%XX` sequences\n\n```go\nfunc TestHandleURL_DecodeInvalidSequence(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"%ZZ\",\"action\":\"decode\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/encode/url\", body)\n    w := httptest.NewRecorder()\n    HandleURL(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid escape\") }\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "4. **HandleColor** — color.go",
+        "content": "**Missing:**\n- RGB values > 255 (should error, currently doesn't)\n- RGB values < 0\n- Invalid hex length (e.g., `\"#12345\"`)\n\n```go\nfunc TestHandleColor_HexInvalidLength(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"#12345\",\"from\":\"hex\",\"to\":\"rgb\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/color\", body)\n    w := httptest.NewRecorder()\n    HandleColor(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid hex length\") }\n}\n\nfunc TestHandleColor_RGBOverflow(t *testing.T) {\n    // Currently passes 256 as valid - should fail\n    body := bytes.NewBufferString(`{\"input\":\"rgb(256,0,0)\",\"from\":\"rgb\",\"to\":\"hex\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/color\", body)\n    w := httptest.NewRecorder()\n    HandleColor(w, req)\n    // Current behavior: produces \"#ff0000\" - arguably incorrect for RGB spec\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "5. **HandlePassword** — password.go",
+        "content": "**Missing:**\n- Length boundary: `<=0` falls back to 16\n- Length boundary: `>128` caps at 128\n- Each char-set flag produces characters from that set\n\n```go\nfunc TestHandlePassword_LengthCapping(t *testing.T) {\n    tests := []struct {\n        length   int\n        expected int\n    }{\n        {0, 16},    // falls back to default\n        {-1, 16},   // falls back to default  \n        {129, 128}, // caps at max\n        {200, 128}, // caps at max\n    }\n    for _, tt := range tests {\n        body := bytes.NewBufferString(fmt.Sprintf(`{\"length\":%d,\"upper\":false,\"digits\":false,\"symbols\":false}`, tt.length))\n        req := httptest.NewRequest(\"POST\", \"/api/password/generate\", body)\n        w := httptest.NewRecorder()\n        HandlePassword(w, req)\n        var resp map[string]string\n        json.Unmarshal(w.Body.Bytes(), &resp)\n        if len(resp[\"output\"]) != tt.expected {\n            t.Errorf(\"length=%d: expected %d, got %d\", tt.length, tt.expected, len(resp[\"output\"]))\n        }\n    }\n}\n\nfunc TestHandlePassword_CharSets(t *testing.T) {\n    // Only lowercase: output should match `[a-z]`\n    body := bytes.NewBufferString(`{\"length\":50,\"upper\":false,\"digits\":false,\"symbols\":false}`)\n    req := httptest.NewRequest(\"POST\", \"/api/password/generate\", body)\n    w := httptest.NewRecorder()\n    HandlePassword(w, req)\n    matched, _ := regexp.MatchString(`^[a-z]+$`, w.Body.String())\n    if !matched { t.Error(\"expected only lowercase chars\") }\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "6. **HandleJWT** — jwt.go",
+        "content": "**Missing:**\n- decodeJWTPart padding logic (2, 3 chars needs different padding)\n- URL-safe base64 replacement (-→+, _→/)\n- Invalid JWT parts that fail base64 decode\n\n```go\nfunc TestDecodeJWTPart_Padding(t *testing.T) {\n    // Test unexported via exported HandleJWT\n    // Valid JWT with 2-char padding needed\n    body := bytes.NewBufferString(`{\"input\":\"eyJhbGciOiJIUzI1NiJ9.e30. signature\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/jwt/decode\", body)\n    w := httptest.NewRecorder()\n    HandleJWT(w, req)\n    if w.Code != http.StatusOK { t.Errorf(\"expected 200, got %d\", w.Code) }\n}\n\nfunc TestHandleJWT_InvalidBase64(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"!!!.!!!.\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/jwt/decode\", body)\n    w := httptest.NewRecorder()\n    HandleJWT(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid JWT\") }\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "7. **HandleTimestamp** — timestamp.go",
+        "content": "**Missing:**\n- Invalid timezone string (falls back to local without error)\n- Millisecond vs second timestamp auto-detection\n\n```go\nfunc TestHandleTimestamp_InvalidTimezone(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"1234567890\",\"to\":\"date\",\"timezone\":\"Invalid/Zone\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/timestamp\", body)\n    w := httptest.NewRecorder()\n    HandleTimestamp(w, req)\n    // Current: returns date in local timezone, no error - arguably should warn\n}\n\nfunc TestHandleTimestamp_Milliseconds(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"12345678901234\",\"to\":\"date\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/timestamp\", body)\n    w := httptest.NewRecorder()\n    HandleTimestamp(w, req)\n    // Should auto-detect ms and convert correctly\n}\n\nfunc TestHandleTimestamp_InvalidDateFormat(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"not-a-date\",\"to\":\"timestamp\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/timestamp\", body)\n    w := httptest.NewRecorder()\n    HandleTimestamp(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid date\") }\n}\n```\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "8. **Integration: /api/tools endpoint** — main.go:16",
+        "content": "**Missing:**\n- Full HTTP integration tests for each route\n- Tool list completeness (base64toimg endpoint is `\"\"` in hardcoded list)\n\n---\n\n",
+        "level": 4
+      },
+      {
+        "title": "Frontend (web/)",
+        "content": "**No test files found.** React components, hooks, and utilities all untested.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Summary by Priority",
+        "content": "| Priority | Gap | Risk |\n|----------|-----|------|\n| HIGH | HandleColor allows invalid RGB values (0-255 not enforced) | Runtime behavior issue |\n| HIGH | No HTTP integration tests at all | Unknown if APIs work |\n| MEDIUM | HandleTimestamp silently ignores invalid timezone | Data correctness |\n| MEDIUM | HandleJWT decodeJWTPart padding logic untested | Edge case failure |\n| LOW | Password length boundary behavior untested | Edge case |\n| LOW | Frontend has zero test coverage | Reliability risk |\n\n**Estimated effort to reach 80% coverage:** ~150-200 lines of Go test code across 9 handler files.",
+        "level": 3
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "go",
+        "code": "// Test skeleton\nfunc TestHandleHash_All(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"hello\",\"alg\":\"all\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/hash\", body)\n    w := httptest.NewRecorder()\n    HandleHash(w, req)\n    if w.Code != http.StatusOK { t.Errorf(\"expected 200, got %d\", w.Code) }\n    var resp map[string]string\n    json.Unmarshal(w.Body.Bytes(), &resp)\n    output := resp[\"output\"]\n    if !strings.Contains(output, \"MD5:\") || !strings.Contains(output, \"SHA512:\") {\n        t.Error(\"expected all hash algorithms in output\")\n    }\n}\n\nfunc TestHandleHash_InvalidAlg(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"test\",\"alg\":\"invalid\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/hash\", body)\n    w := httptest.NewRecorder()\n    HandleHash(w, req)\n    if w.Code != http.StatusBadRequest { t.Errorf(\"expected 400, got %d\", w.Code) }\n}"
+      },
+      {
+        "language": "go",
+        "code": "func TestHandleBase64_DecodeInvalid(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"!!!invalid-base64\",\"action\":\"decode\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/encode/base64\", body)\n    w := httptest.NewRecorder()\n    HandleBase64(w, req)\n    if w.Code != http.StatusBadRequest { t.Errorf(\"expected 400, got %d\", w.Code) }\n}"
+      },
+      {
+        "language": "go",
+        "code": "func TestHandleURL_DecodeInvalidSequence(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"%ZZ\",\"action\":\"decode\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/encode/url\", body)\n    w := httptest.NewRecorder()\n    HandleURL(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid escape\") }\n}"
+      },
+      {
+        "language": "go",
+        "code": "func TestHandleColor_HexInvalidLength(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"#12345\",\"from\":\"hex\",\"to\":\"rgb\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/color\", body)\n    w := httptest.NewRecorder()\n    HandleColor(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid hex length\") }\n}\n\nfunc TestHandleColor_RGBOverflow(t *testing.T) {\n    // Currently passes 256 as valid - should fail\n    body := bytes.NewBufferString(`{\"input\":\"rgb(256,0,0)\",\"from\":\"rgb\",\"to\":\"hex\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/color\", body)\n    w := httptest.NewRecorder()\n    HandleColor(w, req)\n    // Current behavior: produces \"#ff0000\" - arguably incorrect for RGB spec\n}"
+      },
+      {
+        "language": "go",
+        "code": "func TestHandlePassword_LengthCapping(t *testing.T) {\n    tests := []struct {\n        length   int\n        expected int\n    }{\n        {0, 16},    // falls back to default\n        {-1, 16},   // falls back to default  \n        {129, 128}, // caps at max\n        {200, 128}, // caps at max\n    }\n    for _, tt := range tests {\n        body := bytes.NewBufferString(fmt.Sprintf(`{\"length\":%d,\"upper\":false,\"digits\":false,\"symbols\":false}`, tt.length))\n        req := httptest.NewRequest(\"POST\", \"/api/password/generate\", body)\n        w := httptest.NewRecorder()\n        HandlePassword(w, req)\n        var resp map[string]string\n        json.Unmarshal(w.Body.Bytes(), &resp)\n        if len(resp[\"output\"]) != tt.expected {\n            t.Errorf(\"length=%d: expected %d, got %d\", tt.length, tt.expected, len(resp[\"output\"]))\n        }\n    }\n}\n\nfunc TestHandlePassword_CharSets(t *testing.T) {\n    // Only lowercase: output should match `[a-z]`\n    body := bytes.NewBufferString(`{\"length\":50,\"upper\":false,\"digits\":false,\"symbols\":false}`)\n    req := httptest.NewRequest(\"POST\", \"/api/password/generate\", body)\n    w := httptest.NewRecorder()\n    HandlePassword(w, req)\n    matched, _ := regexp.MatchString(`^[a-z]+$`, w.Body.String())\n    if !matched { t.Error(\"expected only lowercase chars\") }\n}"
+      },
+      {
+        "language": "go",
+        "code": "func TestDecodeJWTPart_Padding(t *testing.T) {\n    // Test unexported via exported HandleJWT\n    // Valid JWT with 2-char padding needed\n    body := bytes.NewBufferString(`{\"input\":\"eyJhbGciOiJIUzI1NiJ9.e30. signature\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/jwt/decode\", body)\n    w := httptest.NewRecorder()\n    HandleJWT(w, req)\n    if w.Code != http.StatusOK { t.Errorf(\"expected 200, got %d\", w.Code) }\n}\n\nfunc TestHandleJWT_InvalidBase64(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"!!!.!!!.\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/jwt/decode\", body)\n    w := httptest.NewRecorder()\n    HandleJWT(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid JWT\") }\n}"
+      },
+      {
+        "language": "go",
+        "code": "func TestHandleTimestamp_InvalidTimezone(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"1234567890\",\"to\":\"date\",\"timezone\":\"Invalid/Zone\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/timestamp\", body)\n    w := httptest.NewRecorder()\n    HandleTimestamp(w, req)\n    // Current: returns date in local timezone, no error - arguably should warn\n}\n\nfunc TestHandleTimestamp_Milliseconds(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"12345678901234\",\"to\":\"date\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/timestamp\", body)\n    w := httptest.NewRecorder()\n    HandleTimestamp(w, req)\n    // Should auto-detect ms and convert correctly\n}\n\nfunc TestHandleTimestamp_InvalidDateFormat(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"not-a-date\",\"to\":\"timestamp\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/convert/timestamp\", body)\n    w := httptest.NewRecorder()\n    HandleTimestamp(w, req)\n    if w.Code != http.StatusBadRequest { t.Error(\"expected 400 for invalid date\") }\n}"
+      }
+    ]
+  },
+  "rawOutputPreview": "\n\n## Test Coverage Analysis Report\n\n**Project:** some-tools (Go backend + React SPA)\n**Test Coverage: 0%** — No test files found\n\n---\n\n### Backend: 9 Go Handlers, All Untested\n\n| Handler | File | LoC | Functions |\n|---------|------|-----|-----------|\n| HandleJSON | json.go | 32 | 1 |\n| HandleBase64 | base64.go | 38 | 1 |\n| HandleURL | url.go | 38 | 1 |\n| HandleColor | color.go | 78 | 1 |\n| HandleUUID | uuid.go | 17 | 1 |\n| HandleHash | hash.go | 58 | 1 |\n| HandleJWT | jwt.go | 68 | 2 (HandleJWT + unexported decodeJWTPart) |\n| HandlePassword | password.go | 62 | 1 |\n| HandleTimestamp | timestamp.go | 62 | 1 |\n\n---\n\n### Critical Gaps\n\n#### 1. **HandleHash** — hash.go\n**Missing:**\n- `\"all\"` algorithm returns all 4 hashes\n- Invalid algorithm error\n- Empty input handling\n\n```go\n// Test skeleton\nfunc TestHandleHash_All(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"hello\",\"alg\":\"all\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/hash\", body)\n    w := httptest.NewRecorder()\n    HandleHash(w, req)\n    if w.Code != http.StatusOK { t.Errorf(\"expected 200, got %d\", w.Code) }\n    var resp map[string]string\n    json.Unmarshal(w.Body.Bytes(), &resp)\n    output := resp[\"output\"]\n    if !strings.Contains(output, \"MD5:\") || !strings.Contains(output, \"SHA512:\") {\n        t.Error(\"expected all hash algorithms in output\")\n    }\n}\n\nfunc TestHandleHash_InvalidAlg(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"test\",\"alg\":\"invalid\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/hash\", body)\n    w := httptest.NewRecorder()\n    HandleHash(w, req)\n    if w.Code != http.StatusBadRequest { t.Errorf(\"expected 400, got %d\", w.Code) }\n}\n```\n\n---\n\n#### 2. **HandleBase64** — base64.go\n**Missing:**\n- Invalid base64 decode errors (e.g., `\"not-valid-base64!!!\"`)\n\n```go\nfunc TestHandleBase64_DecodeInvalid(t *testing.T) {\n    body := bytes.NewBufferString(`{\"input\":\"!!!invalid-base64\",\"action\":\"decode\"}`)\n    req := httptest.NewRequest(\"POST\", \"/api/encode/base64\", body)\n ",
+  "rawOutputLength": 8096
+}

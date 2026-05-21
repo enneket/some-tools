@@ -1,0 +1,149 @@
+{
+  "timestamp": "2026-05-19T01:46:50.530Z",
+  "mode": "headless",
+  "workerType": "optimize",
+  "model": "sonnet",
+  "durationMs": 80292,
+  "executionId": "optimize_1779155130238_yf8cii",
+  "success": true,
+  "findings": {
+    "sections": [
+      {
+        "title": "Performance Analysis: some-tools",
+        "content": "\n",
+        "level": 1
+      },
+      {
+        "title": "1. N+1 Query Patterns",
+        "content": "\n**Finding**: No database — pure stateless HTTP API. This section does not apply.\n\n---\n\n",
+        "level": 2
+      },
+      {
+        "title": "2. Unnecessary Re-renders in React",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "Issue A: `Home.tsx` — Inline `useEffect` dependencies (line 130-134)",
+        "content": "\n```tsx\nconst filtered = tools.filter(tool => {\n  const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())\n  const matchCategory = category === '全部' || tool.category === category\n  return matchSearch && matchCategory\n})\n```\n\n**Problem**: `filtered` is recalculated on every render. `search.toLowerCase()` and `category` change frequently.\n\n**Fix**: Memoize with `useMemo`:\n\n```tsx\nconst filtered = useMemo(() => {\n  const lower = search.toLowerCase()\n  return tools.filter(tool =>\n    (lower === '' || tool.name.toLowerCase().includes(lower)) &&\n    (category === '全部' || tool.category === category)\n  )\n}, [tools, search, category])\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "Issue B: `JsonFormatter.tsx` — Redundant `useEffect` on `output` (line 43-48)",
+        "content": "\n```tsx\nuseEffect(() => {\n  if (outputRef.current) {\n    outputRef.current.style.height = 'auto'\n    outputRef.current.style.height = Math.min(outputRef.current.scrollHeight, 1000) + 'px'\n  }\n}, [output])\n```\n\n**Problem**: This effect runs on every `output` change. For large JSON, scrollHeight calculation is expensive.\n\n**Fix**: Debounce or only run when output actually changes height:\n\n```tsx\nconst prevHeightRef = useRef<number>(0)\nuseEffect(() => {\n  if (!outputRef.current) return\n  const newHeight = Math.min(outputRef.current.scrollHeight, 1000)\n  if (newHeight !== prevHeightRef.current) {\n    prevHeightRef.current = newHeight\n    outputRef.current.style.height = newHeight + 'px'\n  }\n}, [output])\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "3. Caching Opportunities",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "Issue A: `Home.tsx` — Static maps are recreated on every render",
+        "content": "\n```tsx\nconst CATEGORY_MAP = { ... }\nconst ROUTE_MAP = { ... }\nconst NAME_MAP = { ... }\nconst DESC_MAP = { ... }\n```\n\n**Problem**: These objects are recreated in module scope but referenced as module-level constants — no issue there. However, `CATEGORIES` array (line 108) is recreated.\n\n**Fix**: Move outside component or declare as `const` at module level (already done correctly for the maps — this is not a bug, just noting the pattern is correct).\n\n",
+        "level": 3
+      },
+      {
+        "title": "Issue B: Missing HTTP response caching",
+        "content": "\n**Problem**: `Home.tsx` fetches `/api/tools` on every mount. If the user navigates away and back, it refetches.\n\n**Fix**: Cache in component state or a module-level store:\n\n```tsx\n// Module-level cache\nlet toolsCache: Tool[] | null = null\n\nexport default function Home() {\n  const [tools, setTools] = useState<Tool[]>(toolsCache || [])\n  \n  useEffect(() => {\n    if (toolsCache) return\n    fetch('/api/tools')\n      .then(res => res.json())\n      .then(data => {\n        toolsCache = mapped\n        setTools(mapped)\n      })\n  }, [])\n}\n```\n\nOr use React Query / SWR for stale-while-revalidate caching.\n\n",
+        "level": 3
+      },
+      {
+        "title": "Issue C: `Base64.tsx` — No result caching",
+        "content": "\n```tsx\nconst handleConvert = async () => {\n  // fetches every time button is clicked\n}\n```\n\nIf the user clicks Convert multiple times with the same input, it re-fetches. Add input-based caching:\n\n```tsx\nconst [cache] = useState<Record<string, string>>({})\n\nconst handleConvert = useCallback(async () => {\n  const cached = cache[`${mode}:${input}`]\n  if (cached) { setOutput(cached); return }\n  // ... fetch and cache result\n}, [input, mode, cache])\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "4. Memory Leaks",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "Issue A: `JsonFormatter.tsx` — `setTimeout` without cleanup (line 53)",
+        "content": "\n```tsx\nsetTimeout(() => setCopied(false), 2000)\n```\n\n**Problem**: If component unmounts before 2s, the timeout still fires, calling `setCopied` on an unmounted component.\n\n**Fix**: Use `useEffect` with cleanup:\n\n```tsx\nuseEffect(() => {\n  if (!copied) return\n  const timer = setTimeout(() => setCopied(false), 2000)\n  return () => clearTimeout(timer)\n}, [copied])\n```\n\n",
+        "level": 3
+      },
+      {
+        "title": "Issue B: Potential `useRef` leak",
+        "content": "\nThe `outputRef` in `JsonFormatter.tsx` is used correctly but if the component were to grow in complexity with multiple refs, track cleanup explicitly.\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "5. Redundant Computations",
+        "content": "\n",
+        "level": 2
+      },
+      {
+        "title": "Issue A: `Home.tsx` — Double `toLowerCase()` on every filter iteration",
+        "content": "\n```tsx\nconst matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())\n```\n\n**Problem**: `search.toLowerCase()` is called inside `filter`, recalculated for every tool on every render.\n\n**Fix**: Pre-compute once in `useMemo` (shown in section 2).\n\n",
+        "level": 3
+      },
+      {
+        "title": "Issue B: `JsonFormatter.tsx` — `preprocessJson` regex recompilation",
+        "content": "\n```tsx\nfunction preprocessJson(raw: string): string {\n  let s = raw\n  s = s.replace(/\\/\\/.*$/gm, '')        // regex compiled every call\n  s = s.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '') // regex compiled every call\n  s = s.replace(/'/g, '\"')\n  s = s.replace(/([{,]\\s*)([a-zA-Z_]\\w*)\\s*:/g, '$1\"$2\":')\n  return s\n}\n```\n\n**Problem**: These regex patterns are recompiled on every invocation.\n\n**Fix**: Pre-compile as module-level constants:\n\n```tsx\nconst RE_SINGLE_LINE_COMMENT = /\\/\\/.*$/gm\nconst RE_MULTI_LINE_COMMENT = /\\/\\*[\\s\\S]*?\\*\\//g\nconst RE_TRAILING_COMMA = /,\\s*([}\\]])/g\nconst RE_SINGLE_QUOTE = /'/g\nconst RE_UNQUOTED_KEY = /([{,]\\s*)([a-zA-Z_]\\w*)\\s*:/g\n\nfunction preprocessJson(raw: string): string {\n  return raw\n    .replace(RE_SINGLE_LINE_COMMENT, '')\n    .replace(RE_MULTI_LINE_COMMENT, '')\n    .replace(RE_TRAILING_COMMA, '$1')\n    .replace(RE_SINGLE_QUOTE, '\"')\n    .replace(RE_UNQUOTED_KEY, '$1\"$2\":')\n}\n```\n\n---\n\n",
+        "level": 3
+      },
+      {
+        "title": "Priority Summary",
+        "content": "| Issue | Impact | Effort |\n|-------|--------|--------|\n| `JsonFormatter` regex pre-compilation | CPU on every parse | Low |\n| `Home` `useMemo` for filtered list | Render optimization | Low |\n| `JsonFormatter` setTimeout cleanup | Memory leak | Low |\n| `Base64` result caching | Network savings | Medium |\n| HTTP response caching in `Home` | Network savings | Medium |",
+        "level": 2
+      }
+    ],
+    "codeBlocks": [
+      {
+        "language": "tsx",
+        "code": "const filtered = tools.filter(tool => {\n  const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())\n  const matchCategory = category === '全部' || tool.category === category\n  return matchSearch && matchCategory\n})"
+      },
+      {
+        "language": "tsx",
+        "code": "const filtered = useMemo(() => {\n  const lower = search.toLowerCase()\n  return tools.filter(tool =>\n    (lower === '' || tool.name.toLowerCase().includes(lower)) &&\n    (category === '全部' || tool.category === category)\n  )\n}, [tools, search, category])"
+      },
+      {
+        "language": "tsx",
+        "code": "useEffect(() => {\n  if (outputRef.current) {\n    outputRef.current.style.height = 'auto'\n    outputRef.current.style.height = Math.min(outputRef.current.scrollHeight, 1000) + 'px'\n  }\n}, [output])"
+      },
+      {
+        "language": "tsx",
+        "code": "const prevHeightRef = useRef<number>(0)\nuseEffect(() => {\n  if (!outputRef.current) return\n  const newHeight = Math.min(outputRef.current.scrollHeight, 1000)\n  if (newHeight !== prevHeightRef.current) {\n    prevHeightRef.current = newHeight\n    outputRef.current.style.height = newHeight + 'px'\n  }\n}, [output])"
+      },
+      {
+        "language": "tsx",
+        "code": "const CATEGORY_MAP = { ... }\nconst ROUTE_MAP = { ... }\nconst NAME_MAP = { ... }\nconst DESC_MAP = { ... }"
+      },
+      {
+        "language": "tsx",
+        "code": "// Module-level cache\nlet toolsCache: Tool[] | null = null\n\nexport default function Home() {\n  const [tools, setTools] = useState<Tool[]>(toolsCache || [])\n  \n  useEffect(() => {\n    if (toolsCache) return\n    fetch('/api/tools')\n      .then(res => res.json())\n      .then(data => {\n        toolsCache = mapped\n        setTools(mapped)\n      })\n  }, [])\n}"
+      },
+      {
+        "language": "tsx",
+        "code": "const handleConvert = async () => {\n  // fetches every time button is clicked\n}"
+      },
+      {
+        "language": "tsx",
+        "code": "const [cache] = useState<Record<string, string>>({})\n\nconst handleConvert = useCallback(async () => {\n  const cached = cache[`${mode}:${input}`]\n  if (cached) { setOutput(cached); return }\n  // ... fetch and cache result\n}, [input, mode, cache])"
+      },
+      {
+        "language": "tsx",
+        "code": "setTimeout(() => setCopied(false), 2000)"
+      },
+      {
+        "language": "tsx",
+        "code": "useEffect(() => {\n  if (!copied) return\n  const timer = setTimeout(() => setCopied(false), 2000)\n  return () => clearTimeout(timer)\n}, [copied])"
+      },
+      {
+        "language": "tsx",
+        "code": "const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())"
+      },
+      {
+        "language": "tsx",
+        "code": "function preprocessJson(raw: string): string {\n  let s = raw\n  s = s.replace(/\\/\\/.*$/gm, '')        // regex compiled every call\n  s = s.replace(/\\/\\*[\\s\\S]*?\\*\\//g, '') // regex compiled every call\n  s = s.replace(/'/g, '\"')\n  s = s.replace(/([{,]\\s*)([a-zA-Z_]\\w*)\\s*:/g, '$1\"$2\":')\n  return s\n}"
+      },
+      {
+        "language": "tsx",
+        "code": "const RE_SINGLE_LINE_COMMENT = /\\/\\/.*$/gm\nconst RE_MULTI_LINE_COMMENT = /\\/\\*[\\s\\S]*?\\*\\//g\nconst RE_TRAILING_COMMA = /,\\s*([}\\]])/g\nconst RE_SINGLE_QUOTE = /'/g\nconst RE_UNQUOTED_KEY = /([{,]\\s*)([a-zA-Z_]\\w*)\\s*:/g\n\nfunction preprocessJson(raw: string): string {\n  return raw\n    .replace(RE_SINGLE_LINE_COMMENT, '')\n    .replace(RE_MULTI_LINE_COMMENT, '')\n    .replace(RE_TRAILING_COMMA, '$1')\n    .replace(RE_SINGLE_QUOTE, '\"')\n    .replace(RE_UNQUOTED_KEY, '$1\"$2\":')\n}"
+      }
+    ]
+  },
+  "rawOutputPreview": "\n\n# Performance Analysis: some-tools\n\n## 1. N+1 Query Patterns\n\n**Finding**: No database — pure stateless HTTP API. This section does not apply.\n\n---\n\n## 2. Unnecessary Re-renders in React\n\n### Issue A: `Home.tsx` — Inline `useEffect` dependencies (line 130-134)\n\n```tsx\nconst filtered = tools.filter(tool => {\n  const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())\n  const matchCategory = category === '全部' || tool.category === category\n  return matchSearch && matchCategory\n})\n```\n\n**Problem**: `filtered` is recalculated on every render. `search.toLowerCase()` and `category` change frequently.\n\n**Fix**: Memoize with `useMemo`:\n\n```tsx\nconst filtered = useMemo(() => {\n  const lower = search.toLowerCase()\n  return tools.filter(tool =>\n    (lower === '' || tool.name.toLowerCase().includes(lower)) &&\n    (category === '全部' || tool.category === category)\n  )\n}, [tools, search, category])\n```\n\n### Issue B: `JsonFormatter.tsx` — Redundant `useEffect` on `output` (line 43-48)\n\n```tsx\nuseEffect(() => {\n  if (outputRef.current) {\n    outputRef.current.style.height = 'auto'\n    outputRef.current.style.height = Math.min(outputRef.current.scrollHeight, 1000) + 'px'\n  }\n}, [output])\n```\n\n**Problem**: This effect runs on every `output` change. For large JSON, scrollHeight calculation is expensive.\n\n**Fix**: Debounce or only run when output actually changes height:\n\n```tsx\nconst prevHeightRef = useRef<number>(0)\nuseEffect(() => {\n  if (!outputRef.current) return\n  const newHeight = Math.min(outputRef.current.scrollHeight, 1000)\n  if (newHeight !== prevHeightRef.current) {\n    prevHeightRef.current = newHeight\n    outputRef.current.style.height = newHeight + 'px'\n  }\n}, [output])\n```\n\n---\n\n## 3. Caching Opportunities\n\n### Issue A: `Home.tsx` — Static maps are recreated on every render\n\n```tsx\nconst CATEGORY_MAP = { ... }\nconst ROUTE_MAP = { ... }\nconst NAME_MAP = { ... }\nconst DESC_MAP = { ... }\n```\n\n**Problem**: These objects are recreated in module scope but ref",
+  "rawOutputLength": 5835
+}

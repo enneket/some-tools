@@ -171,23 +171,82 @@ func formatFrom(s string, indent int) string {
 
 func formatConditions(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
-	// Split by AND (but not inside parens)
-	parts := splitByKeyword(s, "AND")
+	// Split by AND and OR (respecting parentheses)
+	parts := splitByKeywords(s, []string{"AND", "OR"})
 	var lines []string
-	isFirst := true
+	var pendingKeyword string
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
-		if p == "" || p == "AND" {
+		if p == "" {
 			continue
 		}
-		prefix := ""
-		if !isFirst {
-			prefix = "AND "
+		upper := strings.ToUpper(p)
+		if upper == "AND" || upper == "OR" {
+			pendingKeyword = upper
+			continue
 		}
-		isFirst = false
-		lines = append(lines, ind+prefix+formatInline(p))
+		content := formatInline(p)
+		if pendingKeyword != "" {
+			lines = append(lines, ind+pendingKeyword+" "+content)
+			pendingKeyword = ""
+		} else {
+			lines = append(lines, ind+content)
+		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+func splitByKeywords(s string, kws []string) []string {
+	var result []string
+	var current strings.Builder
+	depth := 0
+	i := 0
+	for i < len(s) {
+		if s[i] == '(' {
+			depth++
+			current.WriteByte(s[i])
+			i++
+			continue
+		}
+		if s[i] == ')' {
+			depth--
+			current.WriteByte(s[i])
+			i++
+			continue
+		}
+		if depth == 0 {
+			matched := false
+			for _, kw := range kws {
+				// Need to check bounds before HasPrefix
+				if i+len(kw) <= len(s) && strings.HasPrefix(s[i:], kw) {
+					next := i + len(kw)
+					isBoundary := next >= len(s) || !isIdent(s[next])
+					isStart := i == 0 || !isIdent(s[i-1])
+					if isBoundary && isStart {
+						if current.Len() > 0 {
+							result = append(result, current.String())
+							current.Reset()
+						}
+						result = append(result, kw)
+						i += len(kw)
+						matched = true
+						break
+					}
+				}
+			}
+			if !matched {
+				current.WriteByte(s[i])
+				i++
+			}
+		} else {
+			current.WriteByte(s[i])
+			i++
+		}
+	}
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+	return result
 }
 
 func formatGroupBy(s string, indent int) string {
@@ -236,13 +295,13 @@ func formatJoin(s string, indent int) string {
 		return ind + formatInline(s)
 	}
 
-	// Split rest by ON
+	// Split rest by ON keyword (respecting parentheses)
 	onIdx := findKeyword(rest, " ON ", false)
 	if onIdx >= 0 {
 		tablePart := strings.TrimSpace(rest[:onIdx])
 		condPart := strings.TrimSpace(rest[onIdx+4:])
 		condFormatted := formatConditions(condPart, indent+1)
-		return ind + joinType + " " + formatInline(tablePart) + "\n" + ind + "ON " + condFormatted
+		return ind + joinType + " " + formatInline(tablePart) + "\n" + ind + "  ON " + condFormatted
 	}
 	return ind + joinType + " " + formatInline(rest)
 }

@@ -1,0 +1,11 @@
+{
+  "timestamp": "2026-05-19T01:41:30.252Z",
+  "projectRoot": "/home/zjx/code/mine/some-tools",
+  "structure": {
+    "hasPackageJson": false,
+    "hasTsConfig": false,
+    "hasClaudeConfig": true,
+    "hasClaudeFlow": true
+  },
+  "scannedAt": 1779154890252
+}
