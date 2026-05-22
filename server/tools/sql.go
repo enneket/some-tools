@@ -465,10 +465,39 @@ func splitByMultipleKeywords(s string, kws []string) []string {
 							result = append(result, current.String())
 							current.Reset()
 						}
-						result = append(result, kw)
-						i += len(kw)
-						matched = true
-						break
+						// For JOIN keywords, include table/ON content in the same part
+						if strings.HasSuffix(kw, "JOIN") {
+							joinStart := i
+							i += len(kw)
+							// Collect content until next keyword or end
+							for i < len(s) {
+								foundNext := false
+								for _, nextKw := range kws {
+									if i+len(nextKw) <= len(s) && strings.HasPrefix(s[i:], nextKw) {
+										nextNext := i + len(nextKw)
+										nextIsBoundary := nextNext >= len(s) || !isIdent(s[nextNext])
+										nextIsStart := i == 0 || !isIdent(s[i-1])
+										if nextIsBoundary && nextIsStart {
+											foundNext = true
+											break
+										}
+									}
+								}
+								if foundNext {
+									break
+								}
+								current.WriteByte(s[i])
+								i++
+							}
+							result = append(result, s[joinStart:i])
+							matched = true
+							break
+						} else {
+							result = append(result, kw)
+							i += len(kw)
+							matched = true
+							break
+						}
 					}
 				}
 			}
