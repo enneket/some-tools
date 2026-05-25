@@ -24,7 +24,9 @@ func HandleSQL(w http.ResponseWriter, r *http.Request) {
 }
 
 func FormatSQL(sql string) string {
-	s := collapseWhitespace(sql)
+	// Strip ALL literal backslash sequences (backslash + any char) before collapseWhitespace
+	s := regexp.MustCompile(`\\.`).ReplaceAllString(sql, "")
+	s = collapseWhitespace(s)
 	s = upperCaseKeywords(s)
 	return formatStatement(s, 0)
 }
@@ -68,6 +70,11 @@ func formatStatement(s string, baseIndent int) string {
 	if s == "" {
 		return ""
 	}
+	// REPLACED_LITERAL_N_T: Replace literal \n \t and real \n \t with nothing to strip all whitespace
+	s = strings.ReplaceAll(s, "\\n", "")
+	s = strings.ReplaceAll(s, "\\t", "")
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\t", "")
 	indent := strings.Repeat("  ", baseIndent)
 
 	// Top-level split: SELECT, FROM, WHERE, GROUP BY, ORDER BY, etc.
@@ -136,8 +143,55 @@ func formatSelectFields(s string, indent int) string {
 func formatFrom(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
 	// Check for subquery
-	if strings.HasPrefix(strings.TrimSpace(s), "(") {
-		return formatSubquery(s, indent)
+	trimmed := strings.TrimSpace(s)
+	if strings.HasPrefix(trimmed, "(") {
+		// Check if closing paren exists and what's after it
+		closingIdx := findClosingParen(trimmed)
+		if closingIdx >= 0 {
+			inner := trimmed[1:closingIdx]
+			after := strings.TrimSpace(trimmed[closingIdx+1:])
+			if after != "" {
+				formatted := formatSubqueryInner(inner, indent)
+				restParts := splitByClauseKeywords(after)
+				var parts []string
+				parts = append(parts, "(\n"+formatted+"\n"+ind+")")
+				var currentLines []string
+				for _, p := range restParts {
+					p = strings.TrimSpace(p)
+					if p == "" {
+						continue
+					}
+					upper := strings.ToUpper(p)
+					if isJoinKeyword(upper) {
+						// Flush accumulated lines before this JOIN
+						for _, l := range currentLines {
+							parts = append(parts, ind+"  "+l)
+						}
+						currentLines = nil
+						// Check if previous part ends with "ON" that needs this JOIN's condition
+						if len(parts) > 0 {
+							last := parts[len(parts)-1]
+							if strings.HasSuffix(last, "ON") || strings.HasSuffix(last, "ON ") {
+								// Combine ON with this JOIN
+								lastLine := last + " " + p
+								parts[len(parts)-1] = lastLine
+								continue
+							}
+						}
+						parts = append(parts, formatJoin(p, indent))
+					} else if strings.HasPrefix(upper, "ON ") || strings.HasPrefix(upper, "ON(") {
+						currentLines = append(currentLines, p)
+					} else {
+						currentLines = append(currentLines, p)
+					}
+				}
+				for _, l := range currentLines {
+					parts = append(parts, ind+"  "+l)
+				}
+				return strings.Join(parts, "\n")
+			}
+			return "(\n" + formatSubqueryInner(inner, indent) + "\n" + ind + ")"
+		}
 	}
 	// Split by WHERE, GROUP BY, ORDER BY, LIMIT
 	parts := splitByClauseKeywords(s)
@@ -281,18 +335,50 @@ func formatJoin(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
 	upper := strings.ToUpper(s)
 
-	// Extract join type
+	// Extract join type — handle alias prefix before JOIN
 	joinType := ""
 	rest := s
 	for _, jt := range []string{"LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN", "CROSS JOIN", "FULL JOIN", "LEFT OUTER JOIN", "JOIN"} {
-		if strings.HasPrefix(upper, jt) {
+		idx := strings.Index(upper, jt)
+		if idx >= 0 {
 			joinType = jt
-			rest = strings.TrimSpace(s[len(jt):])
+			rest = strings.TrimSpace(s[idx+len(jt):])
+			// If there was content before the join type (alias), keep it
+			prefix := strings.TrimSpace(s[:idx])
+			if prefix != "" {
+				rest = prefix + " " + joinType + " " + rest
+				joinType = "" // indicate we already have full rest
+			}
 			break
 		}
 	}
+
+	// If we have full rest (original logic without alias prefix)
 	if joinType == "" {
-		return ind + formatInline(s)
+		// rest already contains "alias JOIN table ON ..."
+		parts := splitByKeywords(rest, []string{" ON ", " ON("})
+		if len(parts) >= 2 {
+			// Re-extract join type and table from first part
+			first := parts[0]
+			firstUpper := strings.ToUpper(first)
+			for _, jt := range []string{"LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN", "CROSS JOIN", "FULL JOIN", "LEFT OUTER JOIN", "JOIN"} {
+				jtIdx := strings.Index(firstUpper, jt)
+				if jtIdx >= 0 {
+					joinType = jt
+					alias := strings.TrimSpace(first[:jtIdx])
+					tablePart := strings.TrimSpace(first[jtIdx+len(jt):])
+					// Only use parts[1] as condition, not all remaining parts
+					condPart := strings.TrimSpace(parts[1])
+					condFormatted := formatConditions(condPart, indent+1)
+					if alias != "" {
+						return ind + joinType + " " + alias + " " + tablePart + "\n" + ind + "  ON " + condFormatted
+					}
+					return ind + joinType + " " + formatInline(tablePart) + "\n" + ind + "  ON " + condFormatted
+				}
+			}
+		}
+		// Fallback: inline everything
+		return ind + formatInline(rest)
 	}
 
 	// Split rest by ON keyword (respecting parentheses)
@@ -314,6 +400,25 @@ func formatSubquery(s string, indent int) string {
 	}
 	sub := formatStatement(inner, indent)
 	return "(\n" + sub + "\n" + ind + ")"
+}
+
+func formatSubqueryInner(s string, indent int) string {
+	return formatStatement(s, indent)
+}
+
+func findClosingParen(s string) int {
+	depth := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '(' {
+			depth++
+		} else if s[i] == ')' {
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 func formatInline(s string) string {
@@ -465,10 +570,11 @@ func splitByMultipleKeywords(s string, kws []string) []string {
 							result = append(result, current.String())
 							current.Reset()
 						}
-						// For JOIN keywords, include table/ON content in the same part
+						// For JOIN keywords, use longerKeyword to handle compound types first
 						if strings.HasSuffix(kw, "JOIN") {
 							joinStart := i
-							i += len(kw)
+							joinKw := longerKeyword(kws, s, i)
+							i += len(joinKw)
 							// Collect content until next keyword or end
 							for i < len(s) {
 								foundNext := false
@@ -490,11 +596,6 @@ func splitByMultipleKeywords(s string, kws []string) []string {
 								i++
 							}
 							result = append(result, s[joinStart:i])
-							matched = true
-							break
-						} else {
-							result = append(result, kw)
-							i += len(kw)
 							matched = true
 							break
 						}
@@ -578,9 +679,9 @@ func detectClause(s string) string {
 }
 
 func isJoinKeyword(s string) bool {
-	for _, j := range []string{"JOIN", "LEFT JOIN", "RIGHT JOIN", "INNER JOIN",
-		"OUTER JOIN", "CROSS JOIN", "FULL JOIN", "LEFT OUTER JOIN"} {
-		if s == j {
+	joinTypes := []string{"LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN", "CROSS JOIN", "FULL JOIN", "LEFT OUTER JOIN", "JOIN"}
+	for _, j := range joinTypes {
+		if strings.HasPrefix(s, j) {
 			return true
 		}
 	}
@@ -590,4 +691,14 @@ func isJoinKeyword(s string) bool {
 func isIdent(c byte) bool {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
 		(c >= '0' && c <= '9') || c == '_'
+}
+
+// longerKeyword matches compound JOIN keywords before simple ones
+func longerKeyword(kws []string, s string, i int) string {
+	for _, kw := range kws {
+		if i+len(kw) <= len(s) && strings.HasPrefix(s[i:], kw) {
+			return kw
+		}
+	}
+	return ""
 }
