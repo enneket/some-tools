@@ -331,6 +331,44 @@ func formatOrderBy(s string, indent int) string {
 	return strings.Join(lines, ",\n")
 }
 
+// findONKeyword finds " ON " at top level (depth=0), ignoring those inside parentheses
+func findONKeyword(s string) int {
+	depth := 0
+	for i := 0; i <= len(s)-4; i++ {
+		if s[i] == '(' {
+			depth++
+			continue
+		}
+		if s[i] == ')' {
+			depth--
+			continue
+		}
+		if depth == 0 && strings.HasPrefix(s[i:], " ON ") {
+			return i
+		}
+	}
+	return -1
+}
+
+// formatTablePart formats a table reference, handling subqueries specially
+func formatTablePart(s string, indent int) string {
+	trimmed := strings.TrimSpace(s)
+	if strings.HasPrefix(trimmed, "(") {
+		closingIdx := findClosingParen(trimmed)
+		if closingIdx >= 0 {
+			inner := trimmed[1:closingIdx]
+			after := strings.TrimSpace(trimmed[closingIdx+1:])
+			formattedInner := formatSubqueryInner(inner, indent)
+			if after != "" {
+				// Has alias after subquery: "(...) alias"
+				return "(\n" + formattedInner + "\n" + strings.Repeat("  ", indent) + ")" + " " + after
+			}
+			return "(\n" + formattedInner + "\n" + strings.Repeat("  ", indent) + ")"
+		}
+	}
+	return formatInline(s)
+}
+
 func formatJoin(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
 	upper := strings.ToUpper(s)
@@ -381,13 +419,15 @@ func formatJoin(s string, indent int) string {
 		return ind + formatInline(rest)
 	}
 
-	// Split rest by ON keyword (respecting parentheses)
-	onIdx := findKeyword(rest, " ON ", false)
+	// Split rest by ON keyword - find first " ON " not inside parentheses
+	onIdx := findONKeyword(rest)
 	if onIdx >= 0 {
 		tablePart := strings.TrimSpace(rest[:onIdx])
 		condPart := strings.TrimSpace(rest[onIdx+4:])
 		condFormatted := formatConditions(condPart, indent+1)
-		return ind + joinType + " " + formatInline(tablePart) + "\n" + ind + "  ON " + condFormatted
+		// Check if tablePart is a subquery - starts with ( and has closing )
+		tableFormatted := formatTablePart(tablePart, indent)
+		return ind + joinType + " " + tableFormatted + "\n" + ind + "  ON " + condFormatted
 	}
 	return ind + joinType + " " + formatInline(rest)
 }
@@ -493,7 +533,7 @@ func splitTopLevel(s string) []string {
 
 // splitByClauseKeywords splits on WHERE/GROUP BY/ORDER BY/LIMIT inside FROM content
 func splitByClauseKeywords(s string) []string {
-	kwMap := []string{"WHERE", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET", "ON"}
+	kwMap := []string{"WHERE", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET", "ON", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "OUTER JOIN", "JOIN"}
 	return splitByMultipleKeywords(s, kwMap)
 }
 
