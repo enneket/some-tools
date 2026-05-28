@@ -13,20 +13,28 @@ func HandleSQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
+		SQL   string `json:"sql"`
 		Input string `json:"input"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-	formatted := FormatSQL(req.Input)
+	sql := req.SQL
+	if sql == "" {
+		sql = req.Input
+	}
+	formatted := FormatSQL(sql)
 	json.NewEncoder(w).Encode(map[string]string{"output": formatted})
 }
 
 func FormatSQL(sql string) string {
 	// Strip ALL literal backslash sequences (backslash + any char) before collapseWhitespace
-	s := regexp.MustCompile(`\\.`).ReplaceAllString(sql, "")
+	// Use SPACE as replacement to preserve token separation
+	s := regexp.MustCompile(`\\.`).ReplaceAllString(sql, " ")
 	s = collapseWhitespace(s)
+	// Ensure space before SQL keywords to prevent token concatenation
+	s = ensureKeywordSpacing(s)
 	s = upperCaseKeywords(s)
 	return formatStatement(s, 0)
 }
@@ -35,6 +43,35 @@ var wsRe = regexp.MustCompile(`[\t\r\n]+`)
 
 func collapseWhitespace(s string) string {
 	return strings.Join(strings.Fields(wsRe.ReplaceAllString(s, " ")), " ")
+}
+
+// ensureKeywordSpacing adds space before SQL keywords if missing to prevent token concatenation
+func ensureKeywordSpacing(s string) string {
+	keywords := []string{"SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "ON", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET", "INNER", "LEFT", "RIGHT", "CROSS", "FULL", "OUTER", "HAVING", "UNION", "AS", "CASE", "WHEN", "THEN", "ELSE", "END", "IN", "NOT", "IS", "NULL", "EXISTS", "BETWEEN", "LIKE"}
+
+	result := s
+	for _, kw := range keywords {
+		searchFrom := 0
+		for {
+			pos := strings.Index(result[searchFrom:], kw)
+			if pos < 0 {
+				break
+			}
+			realIdx := searchFrom + pos
+			if realIdx > 0 && result[realIdx-1] != ' ' {
+				prevChar := result[realIdx-1]
+				if prevChar == '_' || (prevChar >= 'a' && prevChar <= 'z') || (prevChar >= 'A' && prevChar <= 'Z') || (prevChar >= '0' && prevChar <= '9') {
+					searchFrom = realIdx + 1
+					continue
+				}
+				result = result[:realIdx] + " " + result[realIdx:]
+				searchFrom = realIdx + len(kw) + 1
+			} else {
+				searchFrom = realIdx + len(kw) + 1
+			}
+		}
+	}
+	return result
 }
 
 var keywords = []string{
@@ -70,11 +107,6 @@ func formatStatement(s string, baseIndent int) string {
 	if s == "" {
 		return ""
 	}
-	// REPLACED_LITERAL_N_T: Replace literal \n \t and real \n \t with nothing to strip all whitespace
-	s = strings.ReplaceAll(s, "\\n", "")
-	s = strings.ReplaceAll(s, "\\t", "")
-	s = strings.ReplaceAll(s, "\n", "")
-	s = strings.ReplaceAll(s, "\t", "")
 	indent := strings.Repeat("  ", baseIndent)
 
 	// Top-level split: SELECT, FROM, WHERE, GROUP BY, ORDER BY, etc.
@@ -196,8 +228,8 @@ func formatFrom(s string, indent int) string {
 	// Split by WHERE, GROUP BY, ORDER BY, LIMIT
 	parts := splitByClauseKeywords(s)
 	var lines []string
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
+	for i := 0; i < len(parts); i++ {
+		p := strings.TrimSpace(parts[i])
 		if p == "" {
 			continue
 		}
@@ -630,15 +662,51 @@ func splitByMultipleKeywords(s string, kws []string) []string {
 									}
 								}
 								if foundNext {
+									// Check if the found keyword is ON — if so, collect through ON+condition
+									onKw := "ON"
+									if i+len(onKw) <= len(s) && strings.HasPrefix(s[i:], onKw) &&
+										(i == 0 || !isIdent(s[i-1])) &&
+										(i+len(onKw) >= len(s) || !isIdent(s[i+len(onKw)])) {
+										// Skip past ON keyword
+										i += len(onKw)
+										// Collect condition until next major keyword or end
+										for i < len(s) {
+											foundNext2 := false
+											for _, nextKw2 := range kws {
+												if i+len(nextKw2) <= len(s) && strings.HasPrefix(s[i:], nextKw2) {
+													nextNext2 := i + len(nextKw2)
+													nextIsBoundary2 := nextNext2 >= len(s) || !isIdent(s[nextNext2])
+													nextIsStart2 := i == 0 || !isIdent(s[i-1])
+													if nextIsBoundary2 && nextIsStart2 {
+														foundNext2 = true
+														break
+													}
+												}
+											}
+											if foundNext2 {
+												break
+											}
+											i++
+										}
+									}
 									break
 								}
-								current.WriteByte(s[i])
 								i++
 							}
-							result = append(result, s[joinStart:i])
+							// Trim trailing whitespace from collected JOIN content
+							joinContent := strings.TrimRight(s[joinStart:i], " \t")
+							if len(joinContent) > 0 {
+								result = append(result, joinContent)
+							}
+							current.Reset()
 							matched = true
 							break
 						}
+						// Non-JOIN keyword: append it and advance past it
+						result = append(result, kw)
+						i += len(kw)
+						matched = true
+						break
 					}
 				}
 			}
