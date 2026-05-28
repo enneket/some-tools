@@ -184,75 +184,206 @@ func formatFrom(s string, indent int) string {
 			after := strings.TrimSpace(trimmed[closingIdx+1:])
 			if after != "" {
 				formatted := formatSubqueryInner(inner, indent)
-				restParts := splitByClauseKeywords(after)
+				// Extract alias (first word after closing paren)
+				alias, rest := extractFirstWord(after)
 				var parts []string
-				parts = append(parts, "(\n"+formatted+"\n"+ind+")")
-				var currentLines []string
-				for _, p := range restParts {
+				parts = append(parts, "(\n"+formatted+"\n"+ind+") "+alias)
+				// Split rest into individual JOINs (each with its ON clause) and trailing clauses
+				joins, trailing := splitRestIntoJoins(rest)
+				for _, j := range joins {
+					parts = append(parts, formatJoin(j, indent))
+				}
+				// Handle trailing WHERE/GROUP BY/ORDER BY/LIMIT
+				trailingParts := splitByClauseKeywords(trailing)
+				for _, p := range trailingParts {
 					p = strings.TrimSpace(p)
 					if p == "" {
 						continue
 					}
 					upper := strings.ToUpper(p)
-					if isJoinKeyword(upper) {
-						// Flush accumulated lines before this JOIN
-						for _, l := range currentLines {
-							parts = append(parts, ind+"  "+l)
-						}
-						currentLines = nil
-						// Check if previous part ends with "ON" that needs this JOIN's condition
-						if len(parts) > 0 {
-							last := parts[len(parts)-1]
-							if strings.HasSuffix(last, "ON") || strings.HasSuffix(last, "ON ") {
-								// Combine ON with this JOIN
-								lastLine := last + " " + p
-								parts[len(parts)-1] = lastLine
-								continue
-							}
-						}
-						parts = append(parts, formatJoin(p, indent))
-					} else if strings.HasPrefix(upper, "ON ") || strings.HasPrefix(upper, "ON(") {
-						currentLines = append(currentLines, p)
-					} else {
-						currentLines = append(currentLines, p)
+					if strings.HasPrefix(upper, "WHERE") {
+						content := strings.TrimSpace(strings.TrimPrefix(p, "WHERE"))
+						parts = append(parts, "WHERE\n"+ind+"  "+formatConditions(content, indent+1))
+					} else if strings.HasPrefix(upper, "GROUP BY") {
+						content := strings.TrimSpace(strings.TrimPrefix(p, "GROUP BY"))
+						parts = append(parts, "GROUP BY\n"+ind+"  "+formatGroupBy(content, indent+1))
+					} else if strings.HasPrefix(upper, "ORDER BY") {
+						content := strings.TrimSpace(strings.TrimPrefix(p, "ORDER BY"))
+						parts = append(parts, "ORDER BY\n"+ind+"  "+formatOrderBy(content, indent+1))
 					}
-				}
-				for _, l := range currentLines {
-					parts = append(parts, ind+"  "+l)
 				}
 				return strings.Join(parts, "\n")
 			}
 			return "(\n" + formatSubqueryInner(inner, indent) + "\n" + ind + ")"
 		}
 	}
-	// Split by WHERE, GROUP BY, ORDER BY, LIMIT
-	parts := splitByClauseKeywords(s)
+	// No subquery - split by JOINs and trailing clauses
+	joins, trailing := splitRestIntoJoins(s)
 	var lines []string
-	for i := 0; i < len(parts); i++ {
-		p := strings.TrimSpace(parts[i])
+	for _, j := range joins {
+		lines = append(lines, formatJoin(j, indent))
+	}
+	// Handle trailing WHERE/GROUP BY/ORDER BY/LIMIT
+	trailingParts := splitByClauseKeywords(trailing)
+	for _, p := range trailingParts {
+		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
 		}
 		upper := strings.ToUpper(p)
 		if strings.HasPrefix(upper, "WHERE") {
-			content := strings.TrimPrefix(p, "WHERE")
-			content = strings.TrimSpace(content)
+			content := strings.TrimSpace(strings.TrimPrefix(p, "WHERE"))
 			lines = append(lines, "WHERE\n"+ind+"  "+formatConditions(content, indent+1))
 		} else if strings.HasPrefix(upper, "GROUP BY") {
-			content := strings.TrimPrefix(p, "GROUP BY")
-			content = strings.TrimSpace(content)
+			content := strings.TrimSpace(strings.TrimPrefix(p, "GROUP BY"))
 			lines = append(lines, "GROUP BY\n"+ind+"  "+formatGroupBy(content, indent+1))
 		} else if strings.HasPrefix(upper, "ORDER BY") {
-			content := strings.TrimPrefix(p, "ORDER BY")
-			content = strings.TrimSpace(content)
+			content := strings.TrimSpace(strings.TrimPrefix(p, "ORDER BY"))
 			lines = append(lines, "ORDER BY\n"+ind+"  "+formatOrderBy(content, indent+1))
-		} else if isJoinKeyword(upper) {
-			lines = append(lines, formatJoin(p, indent))
-		} else {
-			lines = append(lines, formatInline(p))
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// extractFirstWord splits "word rest" into ("word", "rest")
+func extractFirstWord(s string) (string, string) {
+	s = strings.TrimSpace(s)
+	for i := 0; i < len(s); i++ {
+		if s[i] == ' ' || s[i] == '\t' || s[i] == '\n' {
+			return s[:i], strings.TrimSpace(s[i:])
+		}
+	}
+	return s, ""
+}
+
+// splitRestIntoJoins splits the rest of a FROM clause into individual JOIN segments (each with ON clause)
+// and any trailing non-JOIN content (WHERE, GROUP BY, ORDER BY, LIMIT).
+// joinKwTypes lists compound join keywords (longer first) for matching.
+var joinKwTypes = []string{"LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "JOIN"}
+
+func splitRestIntoJoins(rest string) (joins []string, trailing string) {
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return nil, ""
+	}
+
+	i := 0
+	lastJoinEnd := 0
+
+	for i < len(rest) {
+		// Track parentheses to avoid matching inside subqueries
+		if rest[i] == '(' {
+			depth := 1
+			i++
+			for i < len(rest) && depth > 0 {
+				if rest[i] == '(' {
+					depth++
+				} else if rest[i] == ')' {
+					depth--
+				}
+				i++
+			}
+			continue
+		}
+
+		// Check for trailing clause keywords at depth 0
+		for _, tw := range []string{"WHERE", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET"} {
+			if i+len(tw) <= len(rest) && strings.HasPrefix(rest[i:], tw) {
+				next := i + len(tw)
+				isBoundary := next >= len(rest) || !isIdent(rest[next])
+				isStart := i == 0 || !isIdent(rest[i-1])
+				if isBoundary && isStart {
+					trailing = rest[i:]
+					if lastJoinEnd > 0 {
+						joins = append(joins, strings.TrimSpace(rest[:lastJoinEnd]))
+					}
+					return
+				}
+			}
+		}
+
+		// Check for JOIN keyword
+		matched := false
+		for _, jkw := range joinKwTypes {
+			if i+len(jkw) <= len(rest) && strings.HasPrefix(rest[i:], jkw) {
+				next := i + len(jkw)
+				isBoundary := next >= len(rest) || !isIdent(rest[next])
+				isStart := i == 0 || !isIdent(rest[i-1])
+				if isBoundary && isStart {
+					// If we have a previous JOIN accumulated, save it
+					if lastJoinEnd > 0 {
+						joins = append(joins, strings.TrimSpace(rest[:lastJoinEnd]))
+						rest = rest[lastJoinEnd:]
+						i = 0
+					}
+					// Now find where this JOIN ends — at the next JOIN keyword or trailing keyword or end
+					j := i + len(jkw)
+					joinEnd := len(rest) // default: rest of string
+					for j < len(rest) {
+						// Skip parenthesized content
+						if rest[j] == '(' {
+							d := 1
+							j++
+							for j < len(rest) && d > 0 {
+								if rest[j] == '(' {
+									d++
+								} else if rest[j] == ')' {
+									d--
+								}
+								j++
+							}
+							continue
+						}
+						// Check for trailing keywords
+						isTrailing := false
+						for _, tw := range []string{"WHERE", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET"} {
+							if j+len(tw) <= len(rest) && strings.HasPrefix(rest[j:], tw) {
+								n := j + len(tw)
+								ib := n >= len(rest) || !isIdent(rest[n])
+								is := j == 0 || !isIdent(rest[j-1])
+								if ib && is {
+									joinEnd = j
+									isTrailing = true
+									break
+								}
+							}
+						}
+						if isTrailing {
+							break
+						}
+						// Check for next JOIN keyword
+						for _, nkw := range joinKwTypes {
+							if j+len(nkw) <= len(rest) && strings.HasPrefix(rest[j:], nkw) {
+								n := j + len(nkw)
+								ib := n >= len(rest) || !isIdent(rest[n])
+								is := j == 0 || !isIdent(rest[j-1])
+								if ib && is {
+									joinEnd = j
+									goto doneJoin
+								}
+							}
+						}
+						j++
+					}
+				doneJoin:
+					joins = append(joins, strings.TrimSpace(rest[:joinEnd]))
+					rest = rest[joinEnd:]
+					i = 0
+					lastJoinEnd = 0
+					matched = true
+					break
+				}
+			}
+		}
+		if !matched {
+			i++
+			lastJoinEnd = i
+		}
+	}
+	if strings.TrimSpace(rest) != "" {
+		joins = append(joins, strings.TrimSpace(rest))
+	}
+	return
 }
 
 func formatConditions(s string, indent int) string {
@@ -405,63 +536,51 @@ func formatJoin(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
 	upper := strings.ToUpper(s)
 
-	// Extract join type — handle alias prefix before JOIN
+	// Find join type (compound keywords first: LEFT OUTER JOIN before LEFT JOIN)
 	joinType := ""
-	rest := s
-	for _, jt := range []string{"LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN", "CROSS JOIN", "FULL JOIN", "LEFT OUTER JOIN", "JOIN"} {
+	joinStart := -1
+	for _, jt := range []string{"LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "JOIN"} {
 		idx := strings.Index(upper, jt)
 		if idx >= 0 {
-			joinType = jt
-			rest = strings.TrimSpace(s[idx+len(jt):])
-			// If there was content before the join type (alias), keep it
-			prefix := strings.TrimSpace(s[:idx])
-			if prefix != "" {
-				rest = prefix + " " + joinType + " " + rest
-				joinType = "" // indicate we already have full rest
+			// Verify word boundary
+			startOK := idx == 0 || !isIdent(s[idx-1])
+			end := idx + len(jt)
+			endOK := end >= len(s) || !isIdent(s[end])
+			if startOK && endOK {
+				joinType = jt
+				joinStart = idx
+				break
 			}
-			break
 		}
 	}
 
-	// If we have full rest (original logic without alias prefix)
 	if joinType == "" {
-		// rest already contains "alias JOIN table ON ..."
-		parts := splitByKeywords(rest, []string{" ON ", " ON("})
-		if len(parts) >= 2 {
-			// Re-extract join type and table from first part
-			first := parts[0]
-			firstUpper := strings.ToUpper(first)
-			for _, jt := range []string{"LEFT JOIN", "RIGHT JOIN", "INNER JOIN", "OUTER JOIN", "CROSS JOIN", "FULL JOIN", "LEFT OUTER JOIN", "JOIN"} {
-				jtIdx := strings.Index(firstUpper, jt)
-				if jtIdx >= 0 {
-					joinType = jt
-					alias := strings.TrimSpace(first[:jtIdx])
-					tablePart := strings.TrimSpace(first[jtIdx+len(jt):])
-					// Only use parts[1] as condition, not all remaining parts
-					condPart := strings.TrimSpace(parts[1])
-					condFormatted := formatConditions(condPart, indent+1)
-					if alias != "" {
-						return ind + joinType + " " + alias + " " + tablePart + "\n" + ind + "  ON " + condFormatted
-					}
-					return ind + joinType + " " + formatInline(tablePart) + "\n" + ind + "  ON " + condFormatted
-				}
-			}
-		}
-		// Fallback: inline everything
-		return ind + formatInline(rest)
+		return ind + formatInline(s)
 	}
 
-	// Split rest by ON keyword - find first " ON " not inside parentheses
-	onIdx := findONKeyword(rest)
+	// Get the table part (everything after JOIN keyword) and any prefix before it
+	prefix := strings.TrimSpace(s[:joinStart])
+	tableAndRest := strings.TrimSpace(s[joinStart+len(joinType):])
+
+	// Find ON at top level (not inside parentheses)
+	onIdx := findONKeyword(tableAndRest)
 	if onIdx >= 0 {
-		tablePart := strings.TrimSpace(rest[:onIdx])
-		condPart := strings.TrimSpace(rest[onIdx+4:])
+		tablePart := strings.TrimSpace(tableAndRest[:onIdx])
+		condPart := strings.TrimSpace(tableAndRest[onIdx+4:])
 		condFormatted := formatConditions(condPart, indent+1)
-		// Check if tablePart is a subquery - starts with ( and has closing )
 		tableFormatted := formatTablePart(tablePart, indent)
-		return ind + joinType + " " + tableFormatted + "\n" + ind + "  ON " + condFormatted
+		result := ind + joinType + " " + tableFormatted + "\n" + ind + "  ON " + condFormatted
+		if prefix != "" {
+			result = prefix + " " + result
+		}
+		return result
 	}
-	return ind + joinType + " " + formatInline(rest)
+	// No ON clause (e.g., CROSS JOIN)
+	result := ind + joinType + " " + formatInline(tableAndRest)
+	if prefix != "" {
+		result = prefix + " " + result
+	}
+	return result
 }
 
 func formatSubquery(s string, indent int) string {
