@@ -6,7 +6,6 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from '@dnd-kit/core'
 import {
   arrayMove,
@@ -132,6 +131,7 @@ export default function Home() {
   const [tools, setTools] = useState<Tool[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('全部')
+  const [isDragging, setIsDragging] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -170,27 +170,6 @@ export default function Home() {
       })
       .catch(console.error)
   }, [])
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-
-    if (over && active.id !== over.id) {
-      setTools((items) => {
-        const oldIndex = items.findIndex(t => t.id === active.id)
-        const newIndex = items.findIndex(t => t.id === over.id)
-        const newItems = arrayMove(items, oldIndex, newIndex)
-
-        // Save order to localStorage
-        const orderMap: Record<string, number> = {}
-        newItems.forEach((item, index) => {
-          orderMap[item.id] = index
-        })
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(orderMap))
-
-        return newItems
-      })
-    }
-  }
 
   const filtered = tools.filter(tool => {
     const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())
@@ -238,12 +217,32 @@ export default function Home() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={(event) => {
+            setIsDragging(false)
+            const { active, over } = event
+
+            if (over && active.id !== over.id) {
+              setTools((items) => {
+                const oldIndex = items.findIndex(t => t.id === active.id)
+                const newIndex = items.findIndex(t => t.id === over.id)
+                const newItems = arrayMove(items, oldIndex, newIndex)
+
+                const orderMap: Record<string, number> = {}
+                newItems.forEach((item, index) => {
+                  orderMap[item.id] = index
+                })
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(orderMap))
+
+                return newItems
+              })
+            }
+          }}
         >
           <SortableContext items={filtered.map(t => t.id)} strategy={rectSortingStrategy}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
               {filtered.map(tool => (
-                <ToolCard key={tool.id} id={tool.id} name={tool.name} description={tool.description} />
+                <ToolCard key={tool.id} id={tool.id} name={tool.name} description={tool.description} isDragging={isDragging} />
               ))}
             </div>
           </SortableContext>
