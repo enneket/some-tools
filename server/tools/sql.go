@@ -124,7 +124,11 @@ func formatStatement(s string, baseIndent int) string {
 		kw := detectClause(part)
 		if kw != "" {
 			content := strings.TrimSpace(strings.TrimPrefix(part, kw))
-			lines = append(lines, indent+kw+" "+formatClauseContent(content, kw, baseIndent+1))
+			formatted := formatClauseContent(content, kw, baseIndent+1)
+			// formatClauseContent adds its own indent; strip leading indent from first line
+			// so keyword and first content appear on the same line: "SELECT o.id"
+			formatted = strings.TrimLeft(formatted, " ")
+			lines = append(lines, indent+kw+" "+formatted)
 		} else if isJoinKeyword(strings.ToUpper(part)) {
 			lines = append(lines, indent+"  "+formatJoin(part, baseIndent+1))
 		} else {
@@ -186,8 +190,9 @@ func formatFrom(s string, indent int) string {
 				formatted := formatSubqueryInner(inner, indent)
 				// Extract alias (first word after closing paren)
 				alias, rest := extractFirstWord(after)
+				indInner := strings.Repeat("  ", indent+1)
 				var parts []string
-				parts = append(parts, "(\n"+formatted+"\n"+ind+") "+alias)
+				parts = append(parts, "(\n"+formatted+"\n"+indInner+") "+alias)
 				// Split rest into individual JOINs (each with its ON clause) and trailing clauses
 				joins, trailing := splitRestIntoJoins(rest)
 				for _, j := range joins {
@@ -214,7 +219,8 @@ func formatFrom(s string, indent int) string {
 				}
 				return strings.Join(parts, "\n")
 			}
-			return "(\n" + formatSubqueryInner(inner, indent) + "\n" + ind + ")"
+			indInner := strings.Repeat("  ", indent+1)
+			return "(\n" + formatSubqueryInner(inner, indent) + "\n" + indInner + ")"
 		}
 	}
 	// No subquery - split by JOINs and trailing clauses
@@ -494,10 +500,11 @@ func formatOrderBy(s string, indent int) string {
 	return strings.Join(lines, ",\n")
 }
 
-// findONKeyword finds " ON " at top level (depth=0), ignoring those inside parentheses
+// findONKeyword finds "ON" at top level (depth=0), ignoring those inside parentheses.
+// Matches "ON " or "ON(" — the space before ON is required to avoid matching "CONDITION".
 func findONKeyword(s string) int {
 	depth := 0
-	for i := 0; i <= len(s)-4; i++ {
+	for i := 0; i < len(s)-1; i++ {
 		if s[i] == '(' {
 			depth++
 			continue
@@ -506,8 +513,16 @@ func findONKeyword(s string) int {
 			depth--
 			continue
 		}
-		if depth == 0 && strings.HasPrefix(s[i:], " ON ") {
-			return i
+		if depth == 0 && s[i] == 'O' && i+2 <= len(s) && s[i:i+2] == "ON" {
+			// Must be preceded by space (or start of string)
+			if i > 0 && s[i-1] != ' ' {
+				continue
+			}
+			// Must be followed by space or ( to be the ON keyword
+			after := i + 2
+			if after < len(s) && (s[after] == ' ' || s[after] == '(') {
+				return i
+			}
 		}
 	}
 	return -1
@@ -566,10 +581,21 @@ func formatJoin(s string, indent int) string {
 	onIdx := findONKeyword(tableAndRest)
 	if onIdx >= 0 {
 		tablePart := strings.TrimSpace(tableAndRest[:onIdx])
-		condPart := strings.TrimSpace(tableAndRest[onIdx+4:])
+		condPart := strings.TrimSpace(tableAndRest[onIdx+2:])
 		condFormatted := formatConditions(condPart, indent+1)
+		// formatConditions adds its own indent; strip it since we add ind + "  ON " prefix.
+		// For multi-line conditions, re-indent continuation lines to align with ON.
+		condLines := strings.Split(condFormatted, "\n")
+		for i := range condLines {
+			condLines[i] = strings.TrimLeft(condLines[i], " ")
+		}
+		condStr := condLines[0]
+		if len(condLines) > 1 {
+			continuationIndent := ind + "     "
+			condStr = condStr + "\n" + continuationIndent + strings.Join(condLines[1:], "\n"+continuationIndent)
+		}
 		tableFormatted := formatTablePart(tablePart, indent)
-		result := ind + joinType + " " + tableFormatted + "\n" + ind + "  ON " + condFormatted
+		result := ind + joinType + " " + tableFormatted + "\n" + ind + "  ON " + condStr
 		if prefix != "" {
 			result = prefix + " " + result
 		}
