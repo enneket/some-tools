@@ -321,6 +321,11 @@ func splitRestIntoJoins(rest string) (joins []string, trailing string) {
 						joins = append(joins, strings.TrimSpace(rest[:lastJoinEnd]))
 						rest = rest[lastJoinEnd:]
 						i = 0
+					} else if i > 0 {
+						// Content before the first JOIN (e.g., table name) — save as separate segment
+						joins = append(joins, strings.TrimSpace(rest[:i]))
+						rest = rest[i:]
+						i = 0
 					}
 					// Now find where this JOIN ends — at the next JOIN keyword or trailing keyword or end
 					j := i + len(jkw)
@@ -547,25 +552,41 @@ func formatTablePart(s string, indent int) string {
 	return formatInline(s)
 }
 
+
 func formatJoin(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
 	upper := strings.ToUpper(s)
 
-	// Find join type (compound keywords first: LEFT OUTER JOIN before LEFT JOIN)
-	joinType := ""
+	// First find the leftmost JOIN keyword at a word boundary, then determine its type.
+	// This avoids matching JOIN keywords inside subqueries.
 	joinStart := -1
-	for _, jt := range []string{"LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "JOIN"} {
-		idx := strings.Index(upper, jt)
-		if idx >= 0 {
-			// Verify word boundary
-			startOK := idx == 0 || !isIdent(s[idx-1])
-			end := idx + len(jt)
-			endOK := end >= len(s) || !isIdent(s[end])
-			if startOK && endOK {
-				joinType = jt
-				joinStart = idx
-				break
+	for i := 0; i < len(s); i++ {
+		if !isIdent(s[i]) {
+			continue
+		}
+		// Try each join type at this position
+		for _, jt := range []string{"LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "JOIN"} {
+			if i+len(jt) <= len(s) && strings.HasPrefix(upper[i:], jt) {
+				end := i + len(jt)
+				if end >= len(s) || !isIdent(s[end]) {
+					joinStart = i
+					i = len(s) // exit outer loop
+					break
+				}
 			}
+		}
+	}
+
+	if joinStart < 0 {
+		return ind + formatInline(s)
+	}
+
+	// Now determine join type from the known position
+	joinType := ""
+	for _, jt := range []string{"LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN", "JOIN"} {
+		if joinStart+len(jt) <= len(s) && strings.HasPrefix(upper[joinStart:], jt) {
+			joinType = jt
+			break
 		}
 	}
 
