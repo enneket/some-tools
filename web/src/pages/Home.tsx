@@ -1,4 +1,19 @@
 import { useState, useEffect } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable'
 import Header from '../components/Header'
 import ToolCard from '../components/ToolCard'
 
@@ -111,10 +126,19 @@ const DESC_MAP: Record<string, string> = {
 
 const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本']
 
+const STORAGE_KEY = 'some-tools-order'
+
 export default function Home() {
   const [tools, setTools] = useState<Tool[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('全部')
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     fetch('/api/tools')
@@ -126,10 +150,47 @@ export default function Home() {
           description: DESC_MAP[t.name] || t.description,
           category: CATEGORY_MAP[t.name] || '其他',
         }))
+
+        // Load saved order from localStorage
+        const savedOrder = localStorage.getItem(STORAGE_KEY)
+        if (savedOrder) {
+          try {
+            const orderMap: Record<string, number> = JSON.parse(savedOrder)
+            mapped.sort((a: Tool, b: Tool) => {
+              const orderA = orderMap[a.id] ?? 9999
+              const orderB = orderMap[b.id] ?? 9999
+              return orderA - orderB
+            })
+          } catch {
+            // Ignore parse errors
+          }
+        }
+
         setTools(mapped)
       })
       .catch(console.error)
   }, [])
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+
+    if (over && active.id !== over.id) {
+      setTools((items) => {
+        const oldIndex = items.findIndex(t => t.id === active.id)
+        const newIndex = items.findIndex(t => t.id === over.id)
+        const newItems = arrayMove(items, oldIndex, newIndex)
+
+        // Save order to localStorage
+        const orderMap: Record<string, number> = {}
+        newItems.forEach((item, index) => {
+          orderMap[item.id] = index
+        })
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(orderMap))
+
+        return newItems
+      })
+    }
+  }
 
   const filtered = tools.filter(tool => {
     const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())
@@ -174,11 +235,19 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
-          {filtered.map(tool => (
-            <ToolCard key={tool.id} id={tool.id} name={tool.name} description={tool.description} />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={filtered.map(t => t.id)} strategy={rectSortingStrategy}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+              {filtered.map(tool => (
+                <ToolCard key={tool.id} id={tool.id} name={tool.name} description={tool.description} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   )
