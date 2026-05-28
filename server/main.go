@@ -78,7 +78,10 @@ func main() {
 		http.ServeFile(w, r, filepath.Join(distDir, "index.html"))
 	})
 
-	port := "8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	fmt.Printf("ToolHub server starting on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

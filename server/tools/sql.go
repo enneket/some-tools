@@ -163,19 +163,23 @@ func formatSelectFields(s string, indent int) string {
 		return formatSubquery(s, indent)
 	}
 	fields := splitByCommas(s)
-	var lines []string
-	for i, f := range fields {
-		f = strings.TrimSpace(f)
+	if len(fields) == 0 {
+		return ""
+	}
+	// First field: no indent prefix so SELECT keyword and first field stay on same line
+	first := strings.TrimSpace(fields[0])
+	var rest []string
+	for i := 1; i < len(fields); i++ {
+		f := strings.TrimSpace(fields[i])
 		if f == "" {
 			continue
 		}
-		comma := ""
-		if i < len(fields)-1 {
-			comma = ","
-		}
-		lines = append(lines, ind+f+comma)
+		rest = append(rest, ind+f+",")
 	}
-	return strings.Join(lines, "\n")
+	if len(rest) == 0 {
+		return first + ","
+	}
+	return first + ",\n" + strings.Join(rest, "\n")
 }
 
 func formatFrom(s string, indent int) string {
@@ -192,8 +196,14 @@ func formatFrom(s string, indent int) string {
 				formatted := formatSubqueryInner(inner, indent)
 				// Extract alias (first word after closing paren)
 				alias, rest := extractFirstWord(after)
-				indInner := strings.Repeat("  ", indent+1)
+				// If alias is "AS", the real alias is in rest
+				if strings.ToUpper(alias) == "AS" {
+					alias2, rest2 := extractFirstWord(rest)
+					alias = alias + " " + alias2
+					rest = rest2
+				}
 				var parts []string
+				indInner := strings.Repeat("  ", indent+1)
 				parts = append(parts, "(\n"+formatted+"\n"+indInner+") "+alias)
 				// Split rest into individual JOINs (each with its ON clause) and trailing clauses
 				joins, trailing := splitRestIntoJoins(rest)
