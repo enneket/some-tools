@@ -478,6 +478,12 @@ func splitByKeywords(s string, kws []string) []string {
 }
 
 func formatGroupBy(s string, indent int) string {
+	s = strings.TrimSpace(s)
+	// If all fields are simple identifiers (no functions, no expressions),
+	// keep them on one line
+	if isSimpleFieldList(s) {
+		return s
+	}
 	ind := strings.Repeat("  ", indent)
 	fields := splitByCommas(s)
 	var lines []string
@@ -492,6 +498,11 @@ func formatGroupBy(s string, indent int) string {
 }
 
 func formatOrderBy(s string, indent int) string {
+	s = strings.TrimSpace(s)
+	// If all fields are simple identifiers, keep on one line
+	if isSimpleFieldList(s) {
+		return s
+	}
 	ind := strings.Repeat("  ", indent)
 	fields := splitByCommas(s)
 	var lines []string
@@ -950,6 +961,31 @@ func detectClause(s string) string {
 		}
 	}
 	return ""
+}
+
+// isSimpleFieldList checks if a field list contains only simple identifiers
+// (letters, digits, underscores, dots) separated by commas. Used to decide
+// whether to keep GROUP BY / ORDER BY fields on one line.
+func isSimpleFieldList(s string) bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		// Skip allowed characters
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '_' || c == '.' || c == ' ' || c == '\t' {
+			continue
+		}
+		// Comma at depth 0 is ok
+		if c == ',' {
+			continue
+		}
+		// Any other character means it's not simple
+		return false
+	}
+	return true
 }
 
 func isJoinKeyword(s string) bool {
