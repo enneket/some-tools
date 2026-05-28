@@ -150,6 +150,8 @@ func formatClauseContent(s string, kw string, indent int) string {
 		return formatGroupBy(s, indent)
 	case "ORDER BY":
 		return formatOrderBy(s, indent)
+	case "LIMIT", "OFFSET":
+		return strings.TrimSpace(s)
 	default:
 		return formatInline(s)
 	}
