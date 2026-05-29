@@ -131,10 +131,12 @@ export default function Home() {
   const [tools, setTools] = useState<Tool[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('全部')
-  const [isDragging, setIsDragging] = useState(false)
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      preventDefault: false,
+      activationConstraint: { distance: 5 },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -217,9 +219,7 @@ export default function Home() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={() => setIsDragging(true)}
           onDragEnd={(event) => {
-            setIsDragging(false)
             const { active, over } = event
 
             if (over && active.id !== over.id) {
@@ -242,7 +242,7 @@ export default function Home() {
           <SortableContext items={filtered.map(t => t.id)} strategy={rectSortingStrategy}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
               {filtered.map(tool => (
-                <ToolCard key={tool.id} id={tool.id} name={tool.name} description={tool.description} isDragging={isDragging} />
+                <ToolCard key={tool.id} id={tool.id} name={tool.name} description={tool.description} />
               ))}
             </div>
           </SortableContext>
