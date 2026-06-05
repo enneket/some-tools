@@ -14,6 +14,13 @@ export default function M3u8Downloader() {
   const handleDownload = async () => {
     if (!url) return
 
+    try {
+      new URL(url)
+    } catch {
+      alert('请输入有效的 URL 地址')
+      return
+    }
+
     setState({
       status: 'parsing',
       progress: 0,
@@ -53,7 +60,7 @@ export default function M3u8Downloader() {
         />
         <button
           onClick={handleDownload}
-          disabled={!url || state.status === 'downloading' || state.status === 'parsing'}
+          disabled={!url || state.status === 'downloading' || state.status === 'parsing' || state.status === 'decrypting' || state.status === 'merging'}
           style={{
             width: '100%',
             padding: '12px 24px',
@@ -63,10 +70,10 @@ export default function M3u8Downloader() {
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',
-            opacity: (!url || state.status === 'downloading' || state.status === 'parsing') ? 0.5 : 1
+            opacity: (!url || state.status === 'downloading' || state.status === 'parsing' || state.status === 'decrypting' || state.status === 'merging') ? 0.5 : 1
           }}
         >
-          {state.status === 'downloading' || state.status === 'parsing' ? '下载中...' : '开始下载'}
+          {(state.status === 'downloading' || state.status === 'parsing' || state.status === 'decrypting' || state.status === 'merging') ? '处理中...' : '开始下载'}
         </button>
       </div>
 

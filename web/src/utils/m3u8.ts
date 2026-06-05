@@ -10,6 +10,7 @@ export interface Segment {
   uri: string
   duration: number
   title?: string
+  mediaSequence: number
 }
 
 export interface EncryptionInfo {
@@ -44,6 +45,13 @@ function hexToArrayBuffer(hex: string): ArrayBuffer {
   return bytes.buffer
 }
 
+function createMediaSequenceIV(mediaSequence: number): ArrayBuffer {
+  const iv = new Uint8Array(16)
+  const view = new DataView(iv.buffer)
+  view.setUint32(12, mediaSequence, false)
+  return iv.buffer
+}
+
 export async function parseM3u8(url: string): Promise<M3u8Playlist> {
   const response = await fetch(url)
   if (!response.ok) {
@@ -62,21 +70,26 @@ export async function parseM3u8(url: string): Promise<M3u8Playlist> {
   }
 
   const firstSegmentWithKey = manifest.segments.find((s) => s.key)
+  const firstSegmentIndex = firstSegmentWithKey
+    ? manifest.segments.indexOf(firstSegmentWithKey)
+    : 0
+  const mediaSequence = ((manifest as unknown) as Record<string, unknown>).mediaSequence as number | undefined ?? 0
   const encryption = firstSegmentWithKey?.key
     ? {
         method: (firstSegmentWithKey.key.method as 'AES-128' | 'NONE') || 'AES-128',
         uri: new URL(firstSegmentWithKey.key.uri, url).href,
         iv: firstSegmentWithKey.key.iv
           ? hexToArrayBuffer(firstSegmentWithKey.key.iv)
-          : undefined,
+          : createMediaSequenceIV(mediaSequence + firstSegmentIndex),
       }
     : undefined
 
   return {
-    segments: manifest.segments.map((segment) => ({
+    segments: manifest.segments.map((segment, index) => ({
       uri: new URL(segment.uri, url).href,
       duration: segment.duration,
       title: segment.title,
+      mediaSequence: mediaSequence + index,
     })),
     encryption,
   }
@@ -161,12 +174,13 @@ export async function downloadM3u8(
     for (let i = 0; i < totalSegments; i++) {
       const segmentData = await downloadSegment(playlist.segments[i].uri)
 
-      if (playlist.encryption?.method === 'AES-128' && encryptionKey && playlist.encryption.iv) {
+      if (playlist.encryption?.method === 'AES-128' && encryptionKey) {
         updateState({ status: 'decrypting' })
+        const iv = playlist.encryption.iv ?? createMediaSequenceIV(playlist.segments[i].mediaSequence)
         const decrypted = await decryptSegment(
           segmentData,
           encryptionKey,
-          playlist.encryption.iv
+          iv
         )
         segments.push(decrypted)
       } else {
