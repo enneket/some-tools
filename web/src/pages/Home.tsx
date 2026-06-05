@@ -46,6 +46,7 @@ const CATEGORY_MAP: Record<string, string> = {
   'base64toimg': '生成器',
   'httpstatus': '文本',
   'sql': '文本',
+  'm3u8': '媒体',
 }
 
 const ROUTE_MAP: Record<string, string> = {
@@ -71,6 +72,7 @@ const ROUTE_MAP: Record<string, string> = {
   'base64toimg': 'base64-to-image',
   'httpstatus': 'http-status-codes',
   'sql': 'sql-formatter',
+  'm3u8': 'm3u8-downloader',
 }
 
 const NAME_MAP: Record<string, string> = {
@@ -96,6 +98,7 @@ const NAME_MAP: Record<string, string> = {
   'base64toimg': 'Base64 转图片',
   'httpstatus': 'HTTP 状态码',
   'sql': 'SQL 格式化',
+  'm3u8': 'M3U8 下载',
 }
 
 const DESC_MAP: Record<string, string> = {
@@ -121,9 +124,10 @@ const DESC_MAP: Record<string, string> = {
   'base64toimg': '将 Base64 编码转换为图片显示',
   'httpstatus': '快速查询 HTTP 状态码含义',
   'sql': '规范化并格式化 SQL 语句',
+  'm3u8': '下载 M3U8 格式的视频流',
 }
 
-const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本']
+const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本', '媒体']
 
 const STORAGE_KEY = 'some-tools-order'
 

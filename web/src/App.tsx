@@ -22,6 +22,7 @@ import ImageToBase64 from './pages/ImageToBase64'
 import Base64ToImage from './pages/Base64ToImage'
 import HttpStatusCodes from './pages/HttpStatusCodes'
 import SqlFormatter from './pages/SqlFormatter'
+import M3u8Downloader from './pages/M3u8Downloader'
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/tools/base64-to-image" element={<Base64ToImage />} />
         <Route path="/tools/http-status-codes" element={<HttpStatusCodes />} />
         <Route path="/tools/sql-formatter" element={<SqlFormatter />} />
+        <Route path="/tools/m3u8-downloader" element={<M3u8Downloader />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
