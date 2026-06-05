@@ -14,6 +14,13 @@ export default function M3u8Downloader() {
   const handleDownload = async () => {
     if (!url) return
 
+    setState({
+      status: 'parsing',
+      progress: 0,
+      currentSegment: 0,
+      totalSegments: 0
+    })
+
     try {
       await downloadM3u8(url, setState)
     } catch (error) {
