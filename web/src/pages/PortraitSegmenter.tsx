@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import ToolLayout from '../components/ToolLayout'
 import {
   initSegmenter,
@@ -7,6 +7,7 @@ import {
   imageToImageData,
   imageDataToBlob,
   triggerDownload,
+  resetSegmenter,
   ProcessingState,
 } from '../utils/portrait'
 
@@ -15,6 +16,12 @@ export default function PortraitSegmenter() {
   const [result, setResult] = useState<ImageData | null>(null)
   const [state, setState] = useState<ProcessingState>({ status: 'idle' })
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    return () => {
+      resetSegmenter()
+    }
+  }, [])
 
   const handleFile = (file: File) => {
     if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
@@ -27,13 +34,16 @@ export default function PortraitSegmenter() {
 
     const reader = new FileReader()
     reader.onload = (e) => {
+      const result = e.target?.result
+      if (typeof result !== 'string') return
+
       const img = new Image()
       img.onload = () => {
         setImage(img)
         setResult(null)
         setState({ status: 'idle' })
       }
-      img.src = e.target?.result as string
+      img.src = result
     }
     reader.readAsDataURL(file)
   }
@@ -162,8 +172,10 @@ export default function PortraitSegmenter() {
                   if (canvas && result) {
                     canvas.width = result.width
                     canvas.height = result.height
-                    const ctx = canvas.getContext('2d')!
-                    ctx.putImageData(result, 0, 0)
+                    const ctx = canvas.getContext('2d')
+                    if (ctx) {
+                      ctx.putImageData(result, 0, 0)
+                    }
                   }
                 }}
                 style={{

@@ -25,20 +25,32 @@ export async function initSegmenter(): Promise<ImageSegmenter> {
     return segmenterInstance
   }
 
-  const vision = await FilesetResolver.forVisionTasks(
-    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
-  )
+  try {
+    const vision = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+    )
 
-  segmenterInstance = await ImageSegmenter.createFromOptions(vision, {
-    baseOptions: {
-      modelAssetPath: '/models/selfie_segmenter.tflite',
-      delegate: 'GPU',
-    },
-    runningMode: 'IMAGE',
-    outputCategoryMask: true,
-  })
+    segmenterInstance = await ImageSegmenter.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: '/models/selfie_segmenter.tflite',
+        delegate: 'GPU',
+      },
+      runningMode: 'IMAGE',
+      outputCategoryMask: true,
+    })
 
-  return segmenterInstance
+    return segmenterInstance
+  } catch (error) {
+    segmenterInstance = null
+    throw error
+  }
+}
+
+export function resetSegmenter(): void {
+  if (segmenterInstance) {
+    segmenterInstance.close()
+    segmenterInstance = null
+  }
 }
 
 export async function segmentPortrait(
@@ -55,7 +67,10 @@ export async function segmentPortrait(
   const canvas = document.createElement('canvas')
   canvas.width = mask.width
   canvas.height = mask.height
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('无法创建 Canvas 2D 上下文')
+  }
 
   const imageData = ctx.createImageData(canvas.width, canvas.height)
   const maskData = mask.getAsUint8Array()
@@ -108,7 +123,10 @@ export function imageToImageData(image: HTMLImageElement): ImageData {
   const canvas = document.createElement('canvas')
   canvas.width = image.naturalWidth
   canvas.height = image.naturalHeight
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('无法创建 Canvas 2D 上下文')
+  }
   ctx.drawImage(image, 0, 0)
   return ctx.getImageData(0, 0, canvas.width, canvas.height)
 }
@@ -117,7 +135,10 @@ export async function imageDataToBlob(imageData: ImageData): Promise<Blob> {
   const canvas = document.createElement('canvas')
   canvas.width = imageData.width
   canvas.height = imageData.height
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    throw new Error('无法创建 Canvas 2D 上下文')
+  }
   ctx.putImageData(imageData, 0, 0)
 
   return new Promise((resolve, reject) => {
