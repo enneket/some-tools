@@ -47,6 +47,7 @@ const CATEGORY_MAP: Record<string, string> = {
   'httpstatus': '文本',
   'sql': '文本',
   'm3u8': '媒体',
+  'portrait': '生成器',
 }
 
 const ROUTE_MAP: Record<string, string> = {
@@ -73,6 +74,7 @@ const ROUTE_MAP: Record<string, string> = {
   'httpstatus': 'http-status-codes',
   'sql': 'sql-formatter',
   'm3u8': 'm3u8-downloader',
+  'portrait': 'portrait-segmenter',
 }
 
 const NAME_MAP: Record<string, string> = {
@@ -99,6 +101,7 @@ const NAME_MAP: Record<string, string> = {
   'httpstatus': 'HTTP 状态码',
   'sql': 'SQL 格式化',
   'm3u8': 'M3U8 下载',
+  'portrait': '人像抠图',
 }
 
 const DESC_MAP: Record<string, string> = {
@@ -125,6 +128,7 @@ const DESC_MAP: Record<string, string> = {
   'httpstatus': '快速查询 HTTP 状态码含义',
   'sql': '规范化并格式化 SQL 语句',
   'm3u8': '下载 M3U8 格式的视频流',
+  'portrait': '使用 AI 模型进行人像分割',
 }
 
 const CATEGORIES = ['全部', '编解码', '生成器', '转换器', '文本', '媒体']
