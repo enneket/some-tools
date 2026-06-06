@@ -33,7 +33,7 @@ export async function initSegmenter(): Promise<ImageSegmenter> {
     segmenterInstance = await ImageSegmenter.createFromOptions(vision, {
       baseOptions: {
         modelAssetPath: '/models/selfie_segmenter.tflite',
-        delegate: 'GPU',
+        delegate: 'CPU',
       },
       runningMode: 'IMAGE',
       outputCategoryMask: true,
