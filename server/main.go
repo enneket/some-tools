@@ -41,6 +41,8 @@ func main() {
 				{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
 			{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
 		{"name": "sql", "endpoint": "/api/format/sql", "method": "POST", "description": "Format SQL query"},
+		{"name": "m3u8", "endpoint": "", "method": "", "description": "Download M3U8 video stream"},
+		{"name": "portrait", "endpoint": "", "method": "", "description": "Portrait segmentation using AI"},
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"tools": tools,
