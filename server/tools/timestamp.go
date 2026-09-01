@@ -49,9 +49,27 @@ func HandleTimestamp(w http.ResponseWriter, r *http.Request) {
 		if input == "" {
 			input = time.Now().In(loc).Format("2006-01-02 15:04:05")
 		}
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", input, loc)
+		// 支持多种常见格式
+		layouts := []string{
+			"2006-01-02 15:04:05",
+			"2006-01-02 15:04",
+			"2006-01-02T15:04:05",
+			"2006-01-02T15:04",
+			"2006-01-02",
+			"2006/01/02 15:04:05",
+			"2006/01/02 15:04",
+			"2006/01/02",
+		}
+		var t time.Time
+		var err error
+		for _, layout := range layouts {
+			t, err = time.ParseInLocation(layout, input, loc)
+			if err == nil {
+				break
+			}
+		}
 		if err != nil {
-			http.Error(w, "Invalid date format, use '2006-01-02 15:04:05'", http.StatusBadRequest)
+			http.Error(w, "Invalid date format, use '2006-01-02 15:04:05' or similar", http.StatusBadRequest)
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]string{"output": strconv.FormatInt(t.Unix(), 10)})
