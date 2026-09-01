@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
+import AllTools from './pages/AllTools'
 import JsonFormatter from './pages/JsonFormatter'
 import Base64 from './pages/Base64'
 import UrlEncoder from './pages/UrlEncoder'
@@ -30,6 +31,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/all" element={<AllTools />} />
         <Route path="/tools/json-formatter" element={<JsonFormatter />} />
         <Route path="/tools/base64" element={<Base64 />} />
         <Route path="/tools/url-encoder" element={<UrlEncoder />} />

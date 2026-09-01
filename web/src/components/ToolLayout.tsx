@@ -1,5 +1,8 @@
-import { ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+// 嵌入模式（如聚合视图 AllTools）下隐藏返回按钮与标题栏，只渲染工具主体
+export const EmbeddedContext = createContext(false)
 
 interface ToolLayoutProps {
   title: string
@@ -9,6 +12,11 @@ interface ToolLayoutProps {
 
 export default function ToolLayout({ title, description, children }: ToolLayoutProps) {
   const navigate = useNavigate()
+  const embedded = useContext(EmbeddedContext)
+
+  if (embedded) {
+    return <div>{children}</div>
+  }
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px' }}>
