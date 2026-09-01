@@ -14,7 +14,17 @@ export default function AllTools() {
     <div>
       <Header />
       <div style={{ display: 'flex', gap: '40px', maxWidth: '1200px', margin: '0 auto', padding: '40px', alignItems: 'flex-start' }}>
-        <aside style={{ flex: '0 0 200px', position: 'sticky', top: '40px' }}>
+        <aside
+          style={{
+            flex: '0 0 200px',
+            position: 'sticky',
+            top: '40px',
+            maxHeight: 'calc(100vh - 80px)',
+            overflowY: 'auto',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#ddd transparent',
+          }}
+        >
           {CATEGORIES.map(cat => (
             <div key={cat} style={{ marginBottom: '24px' }}>
               <div style={{ fontSize: '13px', color: '#999', marginBottom: '8px' }}>{cat}</div>
