@@ -2,6 +2,7 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -29,20 +30,137 @@ func HandleSQL(w http.ResponseWriter, r *http.Request) {
 }
 
 func FormatSQL(sql string) string {
-	// Strip ALL literal backslash sequences (backslash + any char) before collapseWhitespace
-	// Use SPACE as replacement to preserve token separation
-	s := regexp.MustCompile(`\\.`).ReplaceAllString(sql, " ")
-	s = collapseWhitespace(s)
+	// Protect string literals ('...', "...", `...`) so the passes below never
+	// alter literal content — including whitespace, backslash escapes, and
+	// words that happen to look like SQL keywords.
+	s, literals := protectLiterals(sql)
+	// Collapse whitespace: actual runs of \t \r \n and literal escape
+	// sequences such as "\n" / "\t" outside of strings all become one space.
+	s = normalizeWhitespace(s)
 	// Ensure space before SQL keywords to prevent token concatenation
 	s = ensureKeywordSpacing(s)
 	s = upperCaseKeywords(s)
-	return formatStatement(s, 0)
+	// Run the structural formatting on everything except placeholders, then
+	// put the string literals back verbatim.
+	s = formatStatement(s, 0)
+	return restoreLiterals(s, literals)
 }
 
-var wsRe = regexp.MustCompile(`[\t\r\n]+`)
+// protectLiterals replaces every string literal ('...', "...", `...`) with a
+// §SQL{n}§ placeholder and returns the placeholder-ized text plus the original
+// literals in order. Backslash-escaped quotes and doubled quotes are handled
+// so literal boundaries are detected correctly; unterminated literals
+// are kept as-is.
+func protectLiterals(sql string) (string, []string) {
+	var b strings.Builder
+	b.Grow(len(sql))
+	var literals []string
+	i := 0
+	for i < len(sql) {
+		c := sql[i]
+		if c == '\'' || c == '"' || c == '`' {
+			j := i + 1
+			escaped := false
+			for j < len(sql) {
+				ch := sql[j]
+				if escaped {
+					escaped = false
+				} else if ch == '\\' {
+					escaped = true
+				} else if ch == c {
+					break
+				}
+				j++
+			}
+			if j >= len(sql) {
+				// Unterminated literal: keep the rest untouched.
+				b.WriteString(sql[i:])
+				break
+			}
+			literals = append(literals, sql[i:j+1])
+			b.WriteString(fmt.Sprintf("§SQL%d§", len(literals)-1))
+			i = j + 1
+			continue
+		}
+		b.WriteByte(c)
+		i++
+	}
+	return b.String(), literals
+}
 
-func collapseWhitespace(s string) string {
-	return strings.Join(strings.Fields(wsRe.ReplaceAllString(s, " ")), " ")
+// normalizeWhitespace collapses runs of actual whitespace into a single space
+// and treats literal backslash escape sequences (e.g. "\n", "\t", "\r\n") as
+// whitespace between tokens. String literals are already protected by
+// protectLiterals, so their content is never touched.
+func normalizeWhitespace(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	last := byte(' ')
+	for i := 0; i < len(s); {
+		c := s[i]
+		switch {
+		case c == ' ' || c == '\t' || c == '\r' || c == '\n':
+			for i < len(s) {
+				c2 := s[i]
+				if c2 != ' ' && c2 != '\t' && c2 != '\r' && c2 != '\n' {
+					break
+				}
+				i++
+			}
+			if last != ' ' {
+				b.WriteByte(' ')
+				last = ' '
+			}
+		case c == '\\':
+			// "\\X" (backslash + any char) acts as whitespace between tokens.
+			if last != ' ' {
+				b.WriteByte(' ')
+				last = ' '
+			}
+			if i+1 < len(s) {
+				i += 2
+			} else {
+				i++ // stray trailing backslash
+			}
+		default:
+			b.WriteByte(c)
+			last = c
+			i++
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// restoreLiterals puts the original string literals back in place of their
+// §SQL{n}§ placeholders.
+func restoreLiterals(s string, literals []string) string {
+	if len(literals) == 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		if strings.HasPrefix(s[i:], "§SQL") {
+			j := i + len("§SQL")
+			for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+				j++
+			}
+			if j > i+len("§SQL") && strings.HasPrefix(s[j:], "§") {
+				n := 0
+				for k := i + len("§SQL"); k < j; k++ {
+					n = n*10 + int(s[k]-'0')
+				}
+				if n >= 0 && n < len(literals) {
+					b.WriteString(literals[n])
+					i = j + len("§")
+					continue
+				}
+			}
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
 }
 
 // ensureKeywordSpacing adds space before SQL keywords if missing to prevent token concatenation
@@ -166,18 +284,30 @@ func formatSelectFields(s string, indent int) string {
 	if len(fields) == 0 {
 		return ""
 	}
-	// First field: no indent prefix so SELECT keyword and first field stay on same line
-	first := strings.TrimSpace(fields[0])
-	var rest []string
-	for i := 1; i < len(fields); i++ {
-		f := strings.TrimSpace(fields[i])
-		if f == "" {
-			continue
+	// Drop empty fields (e.g. trailing comma in input) and trim each one.
+	var cleaned []string
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if f != "" {
+			cleaned = append(cleaned, f)
 		}
-		rest = append(rest, ind+f+",")
 	}
-	if len(rest) == 0 {
-		return first + ","
+	if len(cleaned) == 0 {
+		return ""
+	}
+	// First field: no indent prefix so SELECT keyword and first field stay on same line.
+	first := cleaned[0]
+	if len(cleaned) == 1 {
+		return first
+	}
+	// Commas go between fields, never after the last one.
+	var rest []string
+	for i := 1; i < len(cleaned); i++ {
+		comma := ","
+		if i == len(cleaned)-1 {
+			comma = ""
+		}
+		rest = append(rest, ind+cleaned[i]+comma)
 	}
 	return first + ",\n" + strings.Join(rest, "\n")
 }
@@ -574,7 +704,6 @@ func formatTablePart(s string, indent int) string {
 	}
 	return formatInline(s)
 }
-
 
 func formatJoin(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
