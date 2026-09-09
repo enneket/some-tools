@@ -22,6 +22,7 @@ func HandleTimestamp(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 
 	loc := time.Local
 	if req.Timezone != "" {
