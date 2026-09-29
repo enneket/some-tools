@@ -278,9 +278,51 @@ func formatClauseContent(s string, kw string, indent int) string {
 		return formatOrderBy(s, indent)
 	case "LIMIT", "OFFSET":
 		return strings.TrimSpace(s)
+	case "WITH":
+		return formatWith(s, indent)
 	default:
 		return formatInline(s)
 	}
+}
+
+// formatWith 渲染 WITH 子句。CTE 列表按顶层逗号切分，每个 CTE 的括号体
+// 递归按语句格式化，收尾括号与 WITH 关键字所在行对齐。CTE 形如
+// `name [(cols)] AS ( subquery )`，AS 需大小写不敏感定位，故在等长的大写
+// 副本上检索后回到原串切片。
+func formatWith(s string, indent int) string {
+	content := strings.TrimSpace(s)
+	prefix := ""
+	if strings.HasPrefix(strings.ToUpper(content), "RECURSIVE") {
+		prefix = "RECURSIVE "
+		content = strings.TrimSpace(content[len("RECURSIVE"):])
+	}
+
+	indClose := strings.Repeat("  ", max(indent-1, 0))
+	var rendered []string
+	for _, cte := range splitByCommas(content) {
+		cte = strings.TrimSpace(cte)
+		if cte == "" {
+			continue
+		}
+		asIdx := findKeyword(strings.ToUpper(cte), "AS", true)
+		if asIdx < 0 {
+			rendered = append(rendered, formatInline(cte))
+			continue
+		}
+		head := strings.TrimSpace(cte[:asIdx])
+		rest := cte[asIdx+len("AS"):]
+		open := strings.Index(rest, "(")
+		if open < 0 {
+			rendered = append(rendered, formatInline(cte))
+			continue
+		}
+		body := rest[open+1:]
+		if closing := strings.LastIndex(body, ")"); closing >= 0 {
+			body = body[:closing]
+		}
+		rendered = append(rendered, head+" AS (\n"+formatStatement(body, indent)+"\n"+indClose+")")
+	}
+	return prefix + strings.Join(rendered, ",\n")
 }
 
 func formatSelectFields(s string, indent int) string {
@@ -341,8 +383,8 @@ func formatFrom(s string, indent int) string {
 					rest = rest2
 				}
 				var parts []string
-				indInner := strings.Repeat("  ", indent+1)
-				parts = append(parts, "(\n"+formatted+"\n"+indInner+") "+alias)
+				indClose := strings.Repeat("  ", indent-1)
+				parts = append(parts, "(\n"+formatted+"\n"+indClose+") "+alias)
 				// Split rest into individual JOINs (each with its ON clause) and trailing clauses
 				joins, trailing := splitRestIntoJoins(rest)
 				for _, j := range joins {
@@ -369,8 +411,8 @@ func formatFrom(s string, indent int) string {
 				}
 				return strings.Join(parts, "\n")
 			}
-			indInner := strings.Repeat("  ", indent+1)
-			return "(\n" + formatSubqueryInner(inner, indent) + "\n" + indInner + ")"
+			indClose := strings.Repeat("  ", indent-1)
+			return "(\n" + formatSubqueryInner(inner, indent) + "\n" + indClose + ")"
 		}
 	}
 	// No subquery - split by JOINs and trailing clauses

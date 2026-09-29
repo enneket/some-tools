@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	lowerChars = "abcdefghijklmnopqrstuvwxyz"
-	upperChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	digitChars = "0123456789"
+	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
+	upperChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	digitChars  = "0123456789"
 	symbolChars = "!@#$%^&*()_+-=[]{}|;:,.<>?"
 )
 

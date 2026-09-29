@@ -89,9 +89,6 @@ func TestFormatSQLCore(t *testing.T) {
 		name string
 		sql  string
 		want string
-		// knownDefect 记录格式化器当前的错误输出，避免把它固化成期望行为。
-		// 修复对应缺陷后应清空该字段并改写 want。
-		knownDefect string
 	}{
 		// JOIN variants — each must render the join type in uppercase with ON below
 		{
@@ -153,12 +150,11 @@ func TestFormatSQLCore(t *testing.T) {
 			sql:  "SELECT id FROM t;SELECT name FROM s",
 			want: "SELECT id\nFROM t;\nSELECT name\nFROM s",
 		},
-		// Subquery in FROM clause
+		// Subquery in FROM clause — 收尾括号与 FROM 所在行对齐
 		{
-			name:        "subquery-in-from-single-field",
-			sql:         "SELECT * FROM (SELECT id FROM users) AS u",
-			want:        "SELECT *\nFROM (\n  SELECT id\n  FROM users\n    ) AS u",
-			knownDefect: "formatSubquery 收尾括号用 indent-1 计算缩进，比内部 SELECT 多缩进一级，应与内层对齐",
+			name: "subquery-in-from-single-field",
+			sql:  "SELECT * FROM (SELECT id FROM users) AS u",
+			want: "SELECT *\nFROM (\n  SELECT id\n  FROM users\n) AS u",
 		},
 		// Subquery in WHERE clause (IN)
 		{
@@ -206,18 +202,35 @@ func TestFormatSQLCore(t *testing.T) {
 			sql:  "SELECT `id`,`name` FROM `users`",
 			want: "SELECT `id`,\n  `name`\nFROM `users`",
 		},
+		// WITH CTE — CTE 体递归按语句格式化，收尾括号与 WITH 所在行对齐
 		{
-			name:        "with-cte",
-			sql:         "WITH cte AS (SELECT id FROM users) SELECT * FROM cte",
-			want:        "WITH cte AS ( SELECT id FROM users)\nSELECT *\nFROM cte",
-			knownDefect: "formatClauseContent 没有 WITH 分支，CTE 体被 formatInline 压成单行，应递归按语句格式化",
+			name: "with-cte",
+			sql:  "WITH cte AS (SELECT id FROM users) SELECT * FROM cte",
+			want: "WITH cte AS (\n  SELECT id\n  FROM users\n)\nSELECT *\nFROM cte",
+		},
+		{
+			name: "with-multiple-cte",
+			sql:  "WITH a AS (SELECT x FROM t1), b AS (SELECT y FROM t2 WHERE z=3) SELECT * FROM a",
+			want: "WITH a AS (\n  SELECT x\n  FROM t1\n),\nb AS (\n  SELECT y\n  FROM t2\n  WHERE z = 3\n)\nSELECT *\nFROM a",
+		},
+		{
+			name: "with-recursive",
+			sql:  "WITH RECURSIVE tree AS (SELECT id FROM nodes) SELECT * FROM tree",
+			want: "WITH RECURSIVE tree AS (\n  SELECT id\n  FROM nodes\n)\nSELECT *\nFROM tree",
+		},
+		{
+			name: "with-lowercase",
+			sql:  "with cte as (select id from users) select * from cte",
+			want: "WITH cte AS (\n  SELECT id\n  FROM users\n)\nSELECT *\nFROM cte",
+		},
+		{
+			name: "with-cte-column-list",
+			sql:  "WITH cte (id) AS (SELECT id FROM users) SELECT * FROM cte",
+			want: "WITH cte (id) AS (\n  SELECT id\n  FROM users\n)\nSELECT *\nFROM cte",
 		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if c.knownDefect != "" {
-				t.Skipf("已知缺陷未修复: %s", c.knownDefect)
-			}
 			got := FormatSQL(c.sql)
 			if got != c.want {
 				t.Errorf("FormatSQL(%q)\n got: %q\nwant: %q", c.sql, got, c.want)
