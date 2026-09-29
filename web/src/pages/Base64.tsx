@@ -5,18 +5,28 @@ export default function Base64() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
   const [mode, setMode] = useState<'encode' | 'decode'>('encode')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleConvert = async () => {
+    setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/encode/base64', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input, action: mode }),
       })
+      if (!res.ok) {
+        setError(await res.text() || `请求失败 (${res.status})`)
+        return
+      }
       const data = await res.json()
-      setOutput(data.output || data.error || '')
+      setOutput(data.output || '')
     } catch (err) {
-      setOutput('Error: ' + (err as Error).message)
+      setError('请求失败: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -43,7 +53,7 @@ export default function Base64() {
             placeholder={mode === 'encode' ? '输入文本...' : '输入 Base64...'}
             style={{ width: '100%', height: '150px', padding: '12px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', resize: 'vertical', fontFamily: 'monospace' }}
           />
-          <button onClick={handleConvert} style={{ padding: '12px 24px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-start' }}>
+          <button onClick={handleConvert} disabled={loading} style={{ padding: '12px 24px', background: loading ? '#999' : '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: loading ? 'default' : 'pointer', alignSelf: 'flex-start' }}>
             转换
           </button>
           {output && (
@@ -53,6 +63,7 @@ export default function Base64() {
               style={{ width: '100%', height: '150px', padding: '12px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', resize: 'vertical', fontFamily: 'monospace', background: '#f9f9f9' }}
             />
           )}
+          {error && <div style={{ color: '#ef4444', fontSize: '13px' }}>{error}</div>}
         </div>
       </ToolLayout>
   )

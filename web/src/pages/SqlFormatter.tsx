@@ -4,6 +4,8 @@ import ToolLayout from '../components/ToolLayout'
 export default function SqlFormatter() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const outputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -22,16 +24,24 @@ export default function SqlFormatter() {
 
   const handleFormat = async () => {
     if (!input.trim()) return
+    setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/format/sql', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input }),
       })
+      if (!res.ok) {
+        setError(await res.text() || `请求失败 (${res.status})`)
+        return
+      }
       const data = await res.json()
       setOutput(data.output || '')
-    } catch {
-      setOutput('请求失败')
+    } catch (err) {
+      setError('请求失败: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -56,13 +66,14 @@ export default function SqlFormatter() {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={handleFormat}
+            disabled={loading}
             style={{
               padding: '12px 24px',
-              background: '#333',
+              background: loading ? '#999' : '#333',
               color: '#fff',
               border: 'none',
               borderRadius: '8px',
-              cursor: 'pointer',
+              cursor: loading ? 'default' : 'pointer',
             }}
           >
             格式化
@@ -108,6 +119,7 @@ export default function SqlFormatter() {
             />
           </div>
         )}
+        {error && <div style={{ color: '#ef4444', fontSize: '13px' }}>{error}</div>}
       </div>
     </ToolLayout>
   )

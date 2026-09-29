@@ -129,7 +129,7 @@ some-tools/
 | `/api/encode/url` | `{input, mode}` | URL 编解码 |
 | `/api/generate/uuid` | `{count}` | 生成 UUID |
 | `/api/convert/timestamp` | `{input, to}` | 时间戳转换 |
-| `/api/convert/color` | `{input}` | 颜色转换 |
+| `/api/convert/color` | `{input, from, to}` | 颜色转换（`from`/`to` 取 `hex` 或 `rgb`） |
 | `/api/hash` | `{input, alg}` | Hash 计算 |
 | `/api/jwt/decode` | `{input}` | JWT 解析 |
 | `/api/password/generate` | `{length, upper, digits, symbols}` | 密码生成 |

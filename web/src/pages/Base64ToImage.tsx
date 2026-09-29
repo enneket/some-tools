@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ToolLayout from '../components/ToolLayout'
 
 interface ImageResult {
@@ -13,10 +13,24 @@ export default function Base64ToImage() {
   const [input, setInput] = useState('')
   const [image, setImage] = useState<ImageResult | null>(null)
   const [error, setError] = useState('')
+  const objectUrlRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+      }
+    }
+  }, [])
 
   const handleConvert = () => {
     setError('')
     setImage(null)
+
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
 
     try {
       let base64 = input.trim()
@@ -39,6 +53,7 @@ export default function Base64ToImage() {
 
       const blob = new Blob([bytes], { type: mimeType })
       const url = URL.createObjectURL(blob)
+      objectUrlRef.current = url
       const img = new Image()
       img.onload = () => {
         setImage({
@@ -52,6 +67,7 @@ export default function Base64ToImage() {
       img.onerror = () => {
         setError('无法解析图片，请检查 Base64 编码是否正确')
         URL.revokeObjectURL(url)
+        objectUrlRef.current = null
       }
       img.src = url
     } catch {
@@ -60,6 +76,10 @@ export default function Base64ToImage() {
   }
 
   const handleClear = () => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
     setInput('')
     setImage(null)
     setError('')

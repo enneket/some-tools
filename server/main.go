@@ -1,67 +1,105 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"runtime/debug"
+	"syscall"
+	"time"
 
 	"toolhub/tools"
 )
 
+const (
+	maxRequestBodyBytes = 1 << 20
+	shutdownTimeout     = 10 * time.Second
+)
+
+var toolCatalog = []map[string]interface{}{
+	{"name": "json", "endpoint": "/api/format/json", "method": "POST", "description": "Format JSON input"},
+	{"name": "base64", "endpoint": "/api/encode/base64", "method": "POST", "description": "Base64 encode/decode"},
+	{"name": "url", "endpoint": "/api/encode/url", "method": "POST", "description": "URL encode/decode"},
+	{"name": "uuid", "endpoint": "/api/generate/uuid", "method": "POST", "description": "Generate UUID"},
+	{"name": "timestamp", "endpoint": "/api/convert/timestamp", "method": "POST", "description": "Convert timestamp to date"},
+	{"name": "color", "endpoint": "/api/convert/color", "method": "POST", "description": "Convert between HEX and RGB colors"},
+	{"name": "hash", "endpoint": "/api/hash", "method": "POST", "description": "Calculate MD5/SHA1/SHA256/SHA512 hash"},
+	{"name": "jwt", "endpoint": "/api/jwt/decode", "method": "POST", "description": "Decode JWT token"},
+	{"name": "password", "endpoint": "/api/password/generate", "method": "POST", "description": "Generate random password"},
+	{"name": "regex", "endpoint": "", "method": "", "description": "Test regular expressions"},
+	{"name": "markdown", "endpoint": "", "method": "", "description": "Preview Markdown rendering"},
+	{"name": "diff", "endpoint": "", "method": "", "description": "Compare two texts"},
+	{"name": "qrcode", "endpoint": "", "method": "", "description": "Generate QR code from text"},
+	{"name": "cron", "endpoint": "", "method": "", "description": "Parse Cron expression"},
+	{"name": "html-entity", "endpoint": "", "method": "", "description": "HTML entity encode/decode"},
+	{"name": "unicode", "endpoint": "", "method": "", "description": "Unicode encode/decode"},
+	{"name": "base", "endpoint": "", "method": "", "description": "Number base conversion"},
+	{"name": "wordcount", "endpoint": "", "method": "", "description": "Count words and characters"},
+	{"name": "img2base64", "endpoint": "", "method": "", "description": "Convert image to Base64"},
+	{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
+	{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
+	{"name": "sql", "endpoint": "/api/format/sql", "method": "POST", "description": "Format SQL query"},
+	{"name": "translate", "endpoint": "/api/translate", "method": "POST", "description": "Translate text between languages"},
+	{"name": "m3u8", "endpoint": "", "method": "", "description": "Download M3U8 video stream"},
+	{"name": "portrait", "endpoint": "", "method": "", "description": "Portrait segmentation using AI"},
+}
+
+// withAPIContract wraps every JSON API handler so that the response media type,
+// the request body ceiling and panic containment are defined in one place
+// instead of per handler.
+func withAPIContract(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				log.Printf("panic serving %s: %v\n%s", r.URL.Path, recovered, debug.Stack())
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+			}
+		}()
+
+		if r.ContentLength > maxRequestBodyBytes {
+			http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+		w.Header().Set("Content-Type", "application/json")
+		next(w, r)
+	}
+}
+
 func main() {
-	// API routes
-	http.HandleFunc("/api/tools", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/tools", withAPIContract(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		tools := []map[string]interface{}{
-			{"name": "json", "endpoint": "/api/format/json", "method": "POST", "description": "Format JSON input"},
-			{"name": "base64", "endpoint": "/api/encode/base64", "method": "POST", "description": "Base64 encode/decode"},
-			{"name": "url", "endpoint": "/api/encode/url", "method": "POST", "description": "URL encode/decode"},
-			{"name": "uuid", "endpoint": "/api/generate/uuid", "method": "POST", "description": "Generate UUID"},
-			{"name": "timestamp", "endpoint": "/api/convert/timestamp", "method": "POST", "description": "Convert timestamp to date"},
-			{"name": "color", "endpoint": "/api/convert/color", "method": "POST", "description": "Convert between HEX and RGB colors"},
-			{"name": "hash", "endpoint": "/api/hash", "method": "POST", "description": "Calculate MD5/SHA1/SHA256/SHA512 hash"},
-			{"name": "jwt", "endpoint": "/api/jwt/decode", "method": "POST", "description": "Decode JWT token"},
-			{"name": "password", "endpoint": "/api/password/generate", "method": "POST", "description": "Generate random password"},
-			{"name": "regex", "endpoint": "", "method": "", "description": "Test regular expressions"},
-			{"name": "markdown", "endpoint": "", "method": "", "description": "Preview Markdown rendering"},
-			{"name": "diff", "endpoint": "", "method": "", "description": "Compare two texts"},
-			{"name": "qrcode", "endpoint": "", "method": "", "description": "Generate QR code from text"},
-			{"name": "cron", "endpoint": "", "method": "", "description": "Parse Cron expression"},
-			{"name": "html-entity", "endpoint": "", "method": "", "description": "HTML entity encode/decode"},
-			{"name": "unicode", "endpoint": "", "method": "", "description": "Unicode encode/decode"},
-			{"name": "base", "endpoint": "", "method": "", "description": "Number base conversion"},
-			{"name": "wordcount", "endpoint": "", "method": "", "description": "Count words and characters"},
-			{"name": "img2base64", "endpoint": "", "method": "", "description": "Convert image to Base64"},
-			{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
-			{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
-			{"name": "sql", "endpoint": "/api/format/sql", "method": "POST", "description": "Format SQL query"},
-			{"name": "translate", "endpoint": "/api/translate", "method": "POST", "description": "Translate text between languages"},
-			{"name": "m3u8", "endpoint": "", "method": "", "description": "Download M3U8 video stream"},
-			{"name": "portrait", "endpoint": "", "method": "", "description": "Portrait segmentation using AI"},
-		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"tools": tools,
+			"tools": toolCatalog,
 		})
-	})
+	}))
 
-	http.HandleFunc("/api/format/json", tools.HandleJSON)
-	http.HandleFunc("/api/encode/base64", tools.HandleBase64)
-	http.HandleFunc("/api/encode/url", tools.HandleURL)
-	http.HandleFunc("/api/generate/uuid", tools.HandleUUID)
-	http.HandleFunc("/api/convert/timestamp", tools.HandleTimestamp)
-	http.HandleFunc("/api/convert/color", tools.HandleColor)
-	http.HandleFunc("/api/hash", tools.HandleHash)
-	http.HandleFunc("/api/jwt/decode", tools.HandleJWT)
-	http.HandleFunc("/api/password/generate", tools.HandlePassword)
-	http.HandleFunc("/api/format/sql", tools.HandleSQL)
-	http.HandleFunc("/api/translate", tools.HandleTranslate)
-	http.HandleFunc("/api/translate/languages", tools.HandleTranslateLanguages)
+	apiRoutes := map[string]http.HandlerFunc{
+		"/api/format/json":         tools.HandleJSON,
+		"/api/encode/base64":       tools.HandleBase64,
+		"/api/encode/url":          tools.HandleURL,
+		"/api/generate/uuid":       tools.HandleUUID,
+		"/api/convert/timestamp":   tools.HandleTimestamp,
+		"/api/convert/color":       tools.HandleColor,
+		"/api/hash":                tools.HandleHash,
+		"/api/jwt/decode":          tools.HandleJWT,
+		"/api/password/generate":   tools.HandlePassword,
+		"/api/format/sql":          tools.HandleSQL,
+		"/api/translate":           tools.HandleTranslate,
+		"/api/translate/languages": tools.HandleTranslateLanguages,
+	}
+	for pattern, handler := range apiRoutes {
+		http.HandleFunc(pattern, withAPIContract(handler))
+	}
 
 	// Serve static files from disk
 	distDir := filepath.Join(".", "dist")
@@ -87,6 +125,25 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	server := &http.Server{Addr: ":" + port}
+
+	shutdownRequested := make(chan os.Signal, 1)
+	signal.Notify(shutdownRequested, os.Interrupt, syscall.SIGTERM)
+	shutdownComplete := make(chan struct{})
+	go func() {
+		defer close(shutdownComplete)
+		<-shutdownRequested
+		shutdownContext, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := server.Shutdown(shutdownContext); err != nil {
+			log.Printf("graceful shutdown did not finish: %v", err)
+		}
+	}()
+
 	fmt.Printf("ToolHub server starting on :%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("server stopped: %v", err)
+	}
+	<-shutdownComplete
 }

@@ -5,18 +5,28 @@ export default function HashCalculator() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
   const [alg, setAlg] = useState<'md5' | 'sha1' | 'sha256' | 'sha512' | 'all'>('all')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleCalc = async () => {
+    setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/hash', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input, alg }),
       })
+      if (!res.ok) {
+        setError(await res.text() || `请求失败 (${res.status})`)
+        return
+      }
       const data = await res.json()
-      setOutput(data.output || data.error || '')
+      setOutput(data.output || '')
     } catch (err) {
-      setOutput('Error: ' + (err as Error).message)
+      setError('请求失败: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -34,10 +44,11 @@ export default function HashCalculator() {
             <button key={a} onClick={() => setAlg(a)} style={{ padding: '8px 16px', background: alg === a ? '#333' : '#f5f5f5', color: alg === a ? '#fff' : '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', textTransform: 'uppercase' }}>{a}</button>
           ))}
         </div>
-        <button onClick={handleCalc} style={{ padding: '12px 24px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-start' }}>计算</button>
+        <button onClick={handleCalc} disabled={loading} style={{ padding: '12px 24px', background: loading ? '#999' : '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: loading ? 'default' : 'pointer', alignSelf: 'flex-start' }}>计算</button>
         {output && (
           <pre style={{ padding: '16px', background: '#f9f9f9', borderRadius: '8px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>{output}</pre>
         )}
+        {error && <div style={{ color: '#ef4444', fontSize: '13px' }}>{error}</div>}
       </div>
     </ToolLayout>
   )

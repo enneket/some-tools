@@ -41,7 +41,6 @@ export default function TimestampConverter() {
 
   // Row 1: Unix timestamp → 日期
   const [row1Input, setRow1Input] = useState('')
-  const [row1Unit, setRow1Unit] = useState<Unit>('s')
   const [row1Output, setRow1Output] = useState('')
   const [row1Error, setRow1Error] = useState('')
 
@@ -295,17 +294,7 @@ export default function TimestampConverter() {
             placeholder="1788223556"
             style={{ ...inputStyle, flex: 1, minWidth: '200px' }}
           />
-          <select
-            value={row1Unit}
-            onChange={e => setRow1Unit(e.target.value as Unit)}
-            style={selectStyle}
-          >
-            {UNIT_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <span style={{ fontSize: '13px', color: '#999', whiteSpace: 'nowrap' }}>自动识别 秒/毫秒</span>
           <button onClick={handleRow1} style={outlinedBtn}>
             转换
           </button>

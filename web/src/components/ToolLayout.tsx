@@ -21,7 +21,7 @@ export default function ToolLayout({ title, description, children }: ToolLayoutP
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px' }}>
       <button
-        onClick={() => navigate(-1)}
+        onClick={() => embedded ? navigate('/') : navigate(-1)}
         style={{
           display: 'inline-flex',
           alignItems: 'center',

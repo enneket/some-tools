@@ -23,14 +23,25 @@ function encodeHtml(input: string): string {
     .replace(/'/g, '&apos;')
 }
 
+const ENTITY_PATTERN = new RegExp(
+  [
+    ...Object.keys(HTML_ENTITIES).map(entity => entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+    '&#x[0-9a-fA-F]+;',
+    '&#\\d+;',
+  ].join('|'),
+  'g'
+)
+
+// 单次左到右扫描：每个实体只被消费一次，回调结果不会被再次匹配，
+// 因此 `&amp;lt;` 与 `&amp;#60;` 不会被级联解码。
 function decodeHtml(input: string): string {
-  let result = input
-  for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
-    result = result.replace(new RegExp(entity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), char)
-  }
-  result = result.replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)))
-  result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)))
-  return result
+  return input.replace(ENTITY_PATTERN, match => {
+    const named = HTML_ENTITIES[match]
+    if (named !== undefined) return named
+    const isHex = match[2] === 'x' || match[2] === 'X'
+    const code = isHex ? match.slice(3, -1) : match.slice(2, -1)
+    return String.fromCharCode(parseInt(code, isHex ? 16 : 10))
+  })
 }
 
 export default function HtmlEntity() {

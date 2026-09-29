@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import ToolLayout from '../components/ToolLayout'
 
 export default function MarkdownPreview() {
@@ -7,9 +8,9 @@ export default function MarkdownPreview() {
 
   const html = useMemo(() => {
     try {
-      return marked.parse(input) as string
+      return DOMPurify.sanitize(marked.parse(input) as string)
     } catch {
-      return '<p style="color:red">解析错误</p>'
+      return DOMPurify.sanitize('<p style="color:red">解析错误</p>')
     }
   }, [input])
 

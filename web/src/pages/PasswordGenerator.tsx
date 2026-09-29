@@ -7,18 +7,28 @@ export default function PasswordGenerator() {
   const [digits, setDigits] = useState(true)
   const [symbols, setSymbols] = useState(true)
   const [output, setOutput] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleGenerate = async () => {
+    setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/password/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ length, upper, digits, symbols }),
       })
+      if (!res.ok) {
+        setError(await res.text() || `请求失败 (${res.status})`)
+        return
+      }
       const data = await res.json()
-      setOutput(data.output || data.error || '')
+      setOutput(data.output || '')
     } catch (err) {
-      setOutput('Error: ' + (err as Error).message)
+      setError('请求失败: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -38,13 +48,14 @@ export default function PasswordGenerator() {
           <label style={checkboxStyle}><input type="checkbox" checked={digits} onChange={e => setDigits(e.target.checked)} />数字</label>
           <label style={checkboxStyle}><input type="checkbox" checked={symbols} onChange={e => setSymbols(e.target.checked)} />特殊符号</label>
         </div>
-        <button onClick={handleGenerate} style={{ padding: '12px 24px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-start' }}>生成密码</button>
+        <button onClick={handleGenerate} disabled={loading} style={{ padding: '12px 24px', background: loading ? '#999' : '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: loading ? 'default' : 'pointer', alignSelf: 'flex-start' }}>生成密码</button>
         {output && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             <input type="text" value={output} readOnly style={{ flex: 1, padding: '12px', fontSize: '16px', fontFamily: 'monospace', border: '1px solid #e5e5e5', borderRadius: '8px', background: '#f9f9f9' }} />
             <button onClick={() => navigator.clipboard.writeText(output)} style={{ padding: '12px 16px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>复制</button>
           </div>
         )}
+        {error && <div style={{ color: '#ef4444', fontSize: '13px' }}>{error}</div>}
       </div>
     </ToolLayout>
   )

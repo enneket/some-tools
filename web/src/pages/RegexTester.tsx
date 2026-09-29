@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import ToolLayout from '../components/ToolLayout'
 
 export default function RegexTester() {
@@ -28,14 +28,25 @@ export default function RegexTester() {
   }, [pattern, flags, text])
 
   const highlighted = useMemo(() => {
-    if (!pattern || !text || matches.length === 0) return text
-    try {
-      const regex = new RegExp(pattern, flags)
-      return text.replace(regex, '<mark style="background:#fef08a;padding:1px 2px;border-radius:2px">$&</mark>')
-    } catch {
-      return text
+    if (!pattern || !text || matches.length === 0) return [text]
+    const segments: React.ReactNode[] = []
+    let lastIndex = 0
+    for (const m of matches) {
+      if (m.index > lastIndex) {
+        segments.push(text.slice(lastIndex, m.index))
+      }
+      segments.push(
+        <mark key={segments.length} style={{ background: '#fef08a', padding: '1px 2px', borderRadius: '2px' }}>
+          {m.match}
+        </mark>
+      )
+      lastIndex = m.index + m.match.length
     }
-  }, [pattern, flags, text, matches])
+    if (lastIndex < text.length) {
+      segments.push(text.slice(lastIndex))
+    }
+    return segments
+  }, [text, matches, pattern])
 
   return (
     <ToolLayout title="正则测试" description="测试正则表达式匹配">
@@ -66,7 +77,7 @@ export default function RegexTester() {
         {matches.length > 0 && (
           <>
             <div style={{ fontSize: '14px', color: '#666' }}>匹配结果 ({matches.length} 个)</div>
-            <div style={{ padding: '12px', background: '#f9f9f9', borderRadius: '8px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} dangerouslySetInnerHTML={{ __html: highlighted }} />
+            <div style={{ padding: '12px', background: '#f9f9f9', borderRadius: '8px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{highlighted}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {matches.map((m, i) => (
                 <div key={i} style={{ padding: '8px 12px', background: '#fff', border: '1px solid #e5e5e5', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' }}>

@@ -211,11 +211,19 @@ var keywords = []string{
 	"ARRAY", "JSON", "JSONB",
 }
 
+var keywordPatterns map[string]*regexp.Regexp
+
+func init() {
+	keywordPatterns = make(map[string]*regexp.Regexp, len(keywords))
+	for _, kw := range keywords {
+		keywordPatterns[kw] = regexp.MustCompile(`(?i)\b` + kw + `\b`)
+	}
+}
+
 func upperCaseKeywords(sql string) string {
 	result := sql
 	for _, kw := range keywords {
-		re := regexp.MustCompile(`(?i)\b` + kw + `\b`)
-		result = re.ReplaceAllStringFunc(result, strings.ToUpper)
+		result = keywordPatterns[kw].ReplaceAllStringFunc(result, strings.ToUpper)
 	}
 	return result
 }
@@ -811,10 +819,15 @@ func findClosingParen(s string) int {
 	return -1
 }
 
+var (
+	operatorPattern   = regexp.MustCompile(`\s*([=<>!]+)\s*`)
+	whitespacePattern = regexp.MustCompile(`\s+`)
+)
+
 func formatInline(s string) string {
 	s = strings.TrimSpace(s)
-	s = regexp.MustCompile(`\s*([=<>!]+)\s*`).ReplaceAllString(s, " $1 ")
-	s = regexp.MustCompile(`\s+`).ReplaceAllString(s, " ")
+	s = operatorPattern.ReplaceAllString(s, " $1 ")
+	s = whitespacePattern.ReplaceAllString(s, " ")
 	return s
 }
 

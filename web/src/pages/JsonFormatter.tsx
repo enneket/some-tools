@@ -4,13 +4,14 @@ import JsonTree, { collectPaths } from '../components/JsonTree'
 
 const INITIAL_DEPTH = 2
 const MAX_EXPAND_DEPTH = 5
+const MAX_INPUT_SIZE = 5 * 1024 * 1024 // 5 MB
 
 function preprocessJson(raw: string): string {
   let s = raw
   s = s.replace(/\/\/.*$/gm, '')
   s = s.replace(/\/\*[\s\S]*?\*\//g, '')
   s = s.replace(/,\s*([}\]])/g, '$1')
-  s = s.replace(/'/g, '"')
+  s = s.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, inner) => `"${inner.replace(/\\'/g, "'").replace(/\\"/g, '"')}"`)
   s = s.replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":')
   return s
 }
@@ -47,6 +48,12 @@ export default function JsonFormatter() {
 
   const refreshParsed = (): unknown => {
     setError('')
+    if (input.length > MAX_INPUT_SIZE) {
+      setError('输入超过 ' + (MAX_INPUT_SIZE / 1024 / 1024) + ' MB 限制，请减少输入内容')
+      setParsed(null)
+      setExpanded(new Set())
+      return null
+    }
     try {
       const p = parseLenient(input)
       setParsed(p)

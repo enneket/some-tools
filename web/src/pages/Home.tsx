@@ -34,6 +34,7 @@ export default function Home() {
   const [tools, setTools] = useState<Tool[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('全部')
+  const [loadError, setLoadError] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -46,9 +47,16 @@ export default function Home() {
   )
 
   useEffect(() => {
-    fetch('/api/tools')
-      .then(res => res.json())
+    let cancelled = false
+    fetch('/api/tools', { signal: AbortSignal.timeout(10000) })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(await res.text() || `加载失败 (${res.status})`)
+        }
+        return res.json()
+      })
       .then(data => {
+        if (cancelled) return
         const mapped = (data.tools || []).map((t: { name: string; description: string }) => {
           const meta = BY_BACKEND_NAME.get(t.name)
           return {
@@ -76,7 +84,12 @@ export default function Home() {
 
         setTools(mapped)
       })
-      .catch(console.error)
+      .catch(err => {
+        if (!cancelled) setLoadError(err.message || '加载工具列表失败')
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const filtered = tools.filter(tool => {
@@ -103,6 +116,9 @@ export default function Home() {
               borderRadius: '8px',
             }}
           />
+          {loadError && (
+            <div style={{ color: '#ef4444', fontSize: '14px', marginTop: '8px' }}>{loadError}</div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', flexWrap: 'wrap' }}>
           {CATEGORIES.map(cat => (

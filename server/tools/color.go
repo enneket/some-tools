@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var rgbPattern = regexp.MustCompile(`rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)`)
+
 func HandleColor(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -48,8 +50,7 @@ func HandleColor(w http.ResponseWriter, r *http.Request) {
 		}
 		output = fmt.Sprintf("rgb(%d, %d, %d)", r, g, b)
 	case req.From == "rgb" && req.To == "hex":
-		rgbRe := regexp.MustCompile(`rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)`)
-		matches := rgbRe.FindStringSubmatch(req.Input)
+		matches := rgbPattern.FindStringSubmatch(req.Input)
 		if len(matches) != 4 {
 			http.Error(w, "Invalid rgb color format", http.StatusBadRequest)
 			return

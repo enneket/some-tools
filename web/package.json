@@ -13,6 +13,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@mediapipe/tasks-vision": "^0.10.35",
+    "dompurify": "^3.4.16",
     "file-saver": "^2.0.5",
     "m3u8-parser": "^7.2.0",
     "marked": "^18.0.2",

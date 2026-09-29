@@ -5,18 +5,28 @@ export default function ColorConverter() {
   const [input, setInput] = useState('')
   const [output, setOutput] = useState('')
   const [mode, setMode] = useState<'hex2rgb' | 'rgb2hex'>('hex2rgb')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   const handleConvert = async () => {
+    setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/convert/color', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ input, from: mode === 'hex2rgb' ? 'hex' : 'rgb', to: mode === 'hex2rgb' ? 'rgb' : 'hex' }),
       })
+      if (!res.ok) {
+        setError(await res.text() || `请求失败 (${res.status})`)
+        return
+      }
       const data = await res.json()
-      setOutput(data.output || data.error || '')
+      setOutput(data.output || '')
     } catch (err) {
-      setOutput('Error: ' + (err as Error).message)
+      setError('请求失败: ' + (err as Error).message)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -44,7 +54,7 @@ export default function ColorConverter() {
             placeholder={mode === 'hex2rgb' ? '输入 HEX（如 #FF5733）...' : '输入 RGB（如 255, 87, 51）...'}
             style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', fontFamily: 'monospace' }}
           />
-          <button onClick={handleConvert} style={{ padding: '12px 24px', background: '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-start' }}>
+          <button onClick={handleConvert} disabled={loading} style={{ padding: '12px 24px', background: loading ? '#999' : '#333', color: '#fff', border: 'none', borderRadius: '8px', cursor: loading ? 'default' : 'pointer', alignSelf: 'flex-start' }}>
             转换
           </button>
           {output && (
@@ -55,6 +65,7 @@ export default function ColorConverter() {
               style={{ width: '100%', padding: '12px', fontSize: '14px', border: '1px solid #e5e5e5', borderRadius: '8px', fontFamily: 'monospace', background: '#f9f9f9' }}
             />
           )}
+          {error && <div style={{ color: '#ef4444', fontSize: '13px' }}>{error}</div>}
         </div>
       </ToolLayout>
   )
