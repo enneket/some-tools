@@ -21,6 +21,7 @@ import ImageToBase64 from '../pages/ImageToBase64'
 import Base64ToImage from '../pages/Base64ToImage'
 import HttpStatusCodes from '../pages/HttpStatusCodes'
 import SqlFormatter from '../pages/SqlFormatter'
+import Translator from '../pages/Translator'
 import M3u8Downloader from '../pages/M3u8Downloader'
 import PortraitSegmenter from '../pages/PortraitSegmenter'
 
@@ -65,6 +66,7 @@ export const TOOLS: ToolEntry[] = [
   { id: 'word-counter', backendName: 'wordcount', name: '字数统计', description: '统计字符数、词数、行数、字节数', category: '文本', component: WordCounter },
   { id: 'http-status-codes', backendName: 'httpstatus', name: 'HTTP 状态码', description: '快速查询 HTTP 状态码含义', category: '文本', component: HttpStatusCodes },
   { id: 'sql-formatter', backendName: 'sql', name: 'SQL 格式化', description: '规范化并格式化 SQL 语句', category: '文本', component: SqlFormatter },
+  { id: 'translator', backendName: 'translate', name: '文本翻译', description: '多语言互译，支持自动检测源语言', category: '文本', component: Translator },
   // 媒体
   { id: 'm3u8-downloader', backendName: 'm3u8', name: 'M3U8 下载', description: '下载 M3U8 格式的视频流', category: '媒体', component: M3u8Downloader },
 ]

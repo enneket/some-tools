@@ -38,11 +38,12 @@ func main() {
 			{"name": "base", "endpoint": "", "method": "", "description": "Number base conversion"},
 			{"name": "wordcount", "endpoint": "", "method": "", "description": "Count words and characters"},
 			{"name": "img2base64", "endpoint": "", "method": "", "description": "Convert image to Base64"},
-				{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
+			{"name": "base64toimg", "endpoint": "", "method": "", "description": "Convert Base64 to image"},
 			{"name": "httpstatus", "endpoint": "", "method": "", "description": "HTTP status code reference"},
-		{"name": "sql", "endpoint": "/api/format/sql", "method": "POST", "description": "Format SQL query"},
-		{"name": "m3u8", "endpoint": "", "method": "", "description": "Download M3U8 video stream"},
-		{"name": "portrait", "endpoint": "", "method": "", "description": "Portrait segmentation using AI"},
+			{"name": "sql", "endpoint": "/api/format/sql", "method": "POST", "description": "Format SQL query"},
+			{"name": "translate", "endpoint": "/api/translate", "method": "POST", "description": "Translate text between languages"},
+			{"name": "m3u8", "endpoint": "", "method": "", "description": "Download M3U8 video stream"},
+			{"name": "portrait", "endpoint": "", "method": "", "description": "Portrait segmentation using AI"},
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"tools": tools,
@@ -59,6 +60,8 @@ func main() {
 	http.HandleFunc("/api/jwt/decode", tools.HandleJWT)
 	http.HandleFunc("/api/password/generate", tools.HandlePassword)
 	http.HandleFunc("/api/format/sql", tools.HandleSQL)
+	http.HandleFunc("/api/translate", tools.HandleTranslate)
+	http.HandleFunc("/api/translate/languages", tools.HandleTranslateLanguages)
 
 	// Serve static files from disk
 	distDir := filepath.Join(".", "dist")

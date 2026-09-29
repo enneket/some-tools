@@ -1,6 +1,6 @@
 # ToolHub - 开发者工具箱
 
-在线开发者工具集合，提供 JSON 格式化、Base64 编解码、Hash 计算、SQL 格式化、AI 人像抠图等 24 种常用工具。首页支持拖拽排序、分类筛选和搜索。
+在线开发者工具集合，提供 JSON 格式化、Base64 编解码、Hash 计算、SQL 格式化、AI 人像抠图等 25 种常用工具。首页支持拖拽排序、分类筛选和搜索。
 
 ## 首页特性
 
@@ -55,6 +55,7 @@
 | 工具 | 说明 | 类型 |
 |------|------|------|
 | SQL 格式化 | 规范化并格式化 SQL 语句 | API |
+| 文本翻译 | 多语言互译，支持自动检测源语言 | API |
 | 正则测试 | 测试正则表达式匹配 | 前端 |
 | Markdown 预览 | 实时预览 Markdown 渲染 | 前端 |
 | 文本对比 | 比较两段文本的差异 | 前端 |
@@ -110,11 +111,11 @@ some-tools/
 ├── web/                  # React 前端
 │   ├── src/
 │   │   ├── components/   # 公共组件 (Header, ToolCard, ToolLayout)
-│   │   └── pages/        # 工具页面 (24 个工具)
+│   │   └── pages/        # 工具页面 (25 个工具)
 │   └── public/
 └── server/               # Go 后端
     ├── main.go
-    └── tools/            # API handlers (10 个接口)
+    └── tools/            # API handlers (12 个接口)
 ```
 
 ## API 接口
@@ -133,6 +134,22 @@ some-tools/
 | `/api/jwt/decode` | `{input}` | JWT 解析 |
 | `/api/password/generate` | `{length, upper, digits, symbols}` | 密码生成 |
 | `/api/format/sql` | `{input}` | SQL 格式化 |
+| `/api/translate` | `{input, from, to}` | 文本翻译（`from` 传 `auto` 自动检测源语言） |
+| `/api/translate/languages` | 无（GET） | 返回支持的语言清单 |
+
+## 翻译服务
+
+`/api/translate` 依次尝试两个服务，第一个成功的即采用：
+
+1. **Google 免费端点**（非官方）— 主服务，支持 `from=auto` 自动检测源语言
+2. **MyMemory**（官方免费）— 主服务失败时降级使用
+
+MyMemory 不接受 `Autodetect` 作为源语言，降级时会先在本地判断语种（先看文字系统，再看变音符号，最后统计虚词）。判断不出来时接口返回 502 并提示手动指定源语言，而不是猜一个。该服务单次请求上限为 500 字符，超长文本会自动按句号、标点、空格依次切分后分段翻译再拼接。
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `PORT` | `8080` | 服务端口 |
+| `GOOGLE_TRANSLATE_ENDPOINT` | `https://translate.googleapis.com/translate_a/single` | 覆盖主服务地址，可指向自建代理 |
 
 ## License
 
