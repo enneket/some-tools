@@ -185,7 +185,7 @@ func ensureKeywordSpacing(s string) string {
 				result = result[:realIdx] + " " + result[realIdx:]
 				searchFrom = realIdx + len(kw) + 1
 			} else {
-				searchFrom = realIdx + len(kw) + 1
+				searchFrom = realIdx + len(kw)
 			}
 		}
 	}
@@ -325,11 +325,23 @@ func formatWith(s string, indent int) string {
 	return prefix + strings.Join(rendered, ",\n")
 }
 
+// formatSelectField 渲染单个 SELECT 字段。括号内以子句关键字开头（即标量
+// 子查询，可能带别名）递归按语句多行展开；`COUNT(*)`、`(a+b)*2` 这类括号
+// 表达式不是子句，原样保留，避免被误当成子查询拆开。
+func formatSelectField(field string, indent int) string {
+	trimmed := strings.TrimSpace(field)
+	if !strings.HasPrefix(trimmed, "(") {
+		return trimmed
+	}
+	closingIdx := findClosingParen(trimmed)
+	if closingIdx < 0 || detectClause(trimmed[1:closingIdx]) == "" {
+		return trimmed
+	}
+	return formatTablePart(trimmed, indent)
+}
+
 func formatSelectFields(s string, indent int) string {
 	ind := strings.Repeat("  ", indent)
-	if strings.HasPrefix(strings.TrimSpace(s), "(") {
-		return formatSubquery(s, indent)
-	}
 	fields := splitByCommas(s)
 	if len(fields) == 0 {
 		return ""
@@ -346,7 +358,7 @@ func formatSelectFields(s string, indent int) string {
 		return ""
 	}
 	// First field: no indent prefix so SELECT keyword and first field stay on same line.
-	first := cleaned[0]
+	first := formatSelectField(cleaned[0], indent)
 	if len(cleaned) == 1 {
 		return first
 	}
@@ -357,7 +369,8 @@ func formatSelectFields(s string, indent int) string {
 		if i == len(cleaned)-1 {
 			comma = ""
 		}
-		rest = append(rest, ind+cleaned[i]+comma)
+		// 多行子查询字段的续行已带绝对缩进，只有首行需要加前缀。
+		rest = append(rest, ind+formatSelectField(cleaned[i], indent)+comma)
 	}
 	return first + ",\n" + strings.Join(rest, "\n")
 }
@@ -744,7 +757,7 @@ func formatTablePart(s string, indent int) string {
 		if closingIdx >= 0 {
 			inner := trimmed[1:closingIdx]
 			after := strings.TrimSpace(trimmed[closingIdx+1:])
-			formattedInner := formatSubqueryInner(inner, indent)
+			formattedInner := formatSubqueryInner(inner, indent+1)
 			if after != "" {
 				// Has alias after subquery: "(...) alias"
 				return "(\n" + formattedInner + "\n" + strings.Repeat("  ", indent) + ")" + " " + after
@@ -830,16 +843,6 @@ func formatJoin(s string, indent int) string {
 		result = prefix + " " + result
 	}
 	return result
-}
-
-func formatSubquery(s string, indent int) string {
-	ind := strings.Repeat("  ", indent-1)
-	inner := strings.TrimSpace(s)
-	if strings.HasPrefix(inner, "(") && strings.HasSuffix(inner, ")") {
-		inner = inner[1 : len(inner)-1]
-	}
-	sub := formatStatement(inner, indent)
-	return "(\n" + sub + "\n" + ind + ")"
 }
 
 func formatSubqueryInner(s string, indent int) string {

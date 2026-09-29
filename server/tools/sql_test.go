@@ -1,6 +1,10 @@
 package tools
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestFormatSQLWhitespace(t *testing.T) {
 	cases := []struct {
@@ -202,6 +206,56 @@ func TestFormatSQLCore(t *testing.T) {
 			sql:  "SELECT `id`,`name` FROM `users`",
 			want: "SELECT `id`,\n  `name`\nFROM `users`",
 		},
+		// JOIN 中的子查询：内容比 JOIN 深一级，收尾括号与 JOIN 对齐
+		{
+			name: "join-subquery",
+			sql:  "SELECT * FROM users u JOIN (SELECT id FROM orders) o ON u.id=o.id",
+			want: "SELECT *\nFROM users u\n  JOIN (\n    SELECT id\n    FROM orders\n  ) o\n    ON u.id = o.id",
+		},
+		{
+			name: "join-subquery-left-outer",
+			sql:  "select id from users u left join (select user_id from orders where s=1) o on u.id=o.user_id",
+			want: "SELECT id\nFROM users u\n  LEFT JOIN (\n    SELECT user_id\n    FROM orders\n    WHERE s = 1\n  ) o\n    ON u.id = o.user_id",
+		},
+		// SELECT 列表中的标量子查询，带别名
+		{
+			name: "select-list-subquery",
+			sql:  "SELECT (SELECT max(id) FROM orders) AS m FROM users",
+			want: "SELECT (\n    SELECT MAX(id)\n    FROM orders\n  ) AS m\nFROM users",
+		},
+		// SELECT 列表中的标量子查询，不带别名
+		{
+			name: "select-list-subquery-no-alias",
+			sql:  "SELECT (SELECT max(id) FROM orders) FROM users",
+			want: "SELECT (\n    SELECT MAX(id)\n    FROM orders\n  )\nFROM users",
+		},
+		// 逗号分隔列表中间的子查询，同样递归多行展开
+		{
+			name: "select-list-subquery-in-middle",
+			sql:  "SELECT a, (SELECT max(id) FROM t WHERE t.a=u.a) AS m, b FROM users u",
+			want: "SELECT a,\n  (\n    SELECT MAX(id)\n    FROM t\n    WHERE t.a = u.a\n  ) AS m,\n  b\nFROM users u",
+		},
+		{
+			name: "select-list-two-subqueries",
+			sql:  "SELECT a, (SELECT x FROM y) AS p, (SELECT z FROM w) AS q, b FROM t",
+			want: "SELECT a,\n  (\n    SELECT x\n    FROM y\n  ) AS p,\n  (\n    SELECT z\n    FROM w\n  ) AS q,\n  b\nFROM t",
+		},
+		// 括号表达式不是子查询，保持单行，不得被拆开
+		{
+			name: "select-list-parenthesized-expression",
+			sql:  "SELECT (a+b) FROM t",
+			want: "SELECT (a+b)\nFROM t",
+		},
+		{
+			name: "select-list-expression-with-suffix",
+			sql:  "SELECT (a+b)*2 FROM t",
+			want: "SELECT (a+b)*2\nFROM t",
+		},
+		{
+			name: "select-list-expression-with-alias",
+			sql:  "SELECT a, (b*c) AS p, d FROM t",
+			want: "SELECT a,\n  (b*c) AS p,\n  d\nFROM t",
+		},
 		// WITH CTE — CTE 体递归按语句格式化，收尾括号与 WITH 所在行对齐
 		{
 			name: "with-cte",
@@ -237,4 +291,33 @@ func TestFormatSQLCore(t *testing.T) {
 			}
 		})
 	}
+}
+
+// 残缺输入（以关键字结尾、括号不配对、空串）此前会让 ensureKeywordSpacing
+// 的 searchFrom 越过字符串末尾而 panic。此处只断言不崩溃，不锁定具体输出。
+func TestFormatSQLNoPanic(t *testing.T) {
+	inputs := []string{
+		"", "   ", "SELECT", "FROM", "a OR", "SELECT 1 UNION",
+		"SELECT * FROM t WHERE", "SELECT a FROM t GROUP BY", "SELECT * FROM t LIMIT",
+		"SELECT ()", "SELECT (((", "SELECT * FROM t JOIN (",
+		"SELECT * FROM t JOIN () ON 1=1", "SELECT (SELECT (SELECT (SELECT 1)))",
+		"SELECT a,(SELECT 1),b FROM t", "JOIN (SELECT 1)",
+		strings.Repeat("(", 300) + "SELECT 1" + strings.Repeat(")", 300),
+		strings.Repeat("SELECT (", 80) + "1" + strings.Repeat(")", 80),
+	}
+	for _, in := range inputs {
+		t.Run(truncForTest(in), func(t *testing.T) {
+			FormatSQL(in)
+		})
+	}
+}
+
+func truncForTest(s string) string {
+	if len(s) > 40 {
+		return fmt.Sprintf("len-%d", len(s))
+	}
+	if s == "" {
+		return "empty"
+	}
+	return s
 }
