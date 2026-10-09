@@ -36,6 +36,7 @@ var toolCatalog = []map[string]interface{}{
 	{"name": "markdown", "endpoint": "", "method": "", "description": "Preview Markdown rendering"},
 	{"name": "diff", "endpoint": "", "method": "", "description": "Compare two texts"},
 	{"name": "qrcode", "endpoint": "", "method": "", "description": "Generate QR code from text"},
+	{"name": "qrcode-decode", "endpoint": "", "method": "", "description": "Recognize QR code from image"},
 	{"name": "cron", "endpoint": "", "method": "", "description": "Parse Cron expression"},
 	{"name": "html-entity", "endpoint": "", "method": "", "description": "HTML entity encode/decode"},
 	{"name": "unicode", "endpoint": "", "method": "", "description": "Unicode encode/decode"},

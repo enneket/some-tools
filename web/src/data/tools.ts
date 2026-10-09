@@ -24,6 +24,7 @@ import SqlFormatter from '../pages/SqlFormatter'
 import Translator from '../pages/Translator'
 import M3u8Downloader from '../pages/M3u8Downloader'
 import PortraitSegmenter from '../pages/PortraitSegmenter'
+import QrCodeDecoder from '../pages/QrCodeDecoder'
 
 export const CATEGORIES = ['编解码', '生成器', '转换器', '文本', '媒体']
 
@@ -69,6 +70,7 @@ export const TOOLS: ToolEntry[] = [
   { id: 'translator', backendName: 'translate', name: '文本翻译', description: '多语言互译，支持自动检测源语言', category: '文本', component: Translator },
   // 媒体
   { id: 'm3u8-downloader', backendName: 'm3u8', name: 'M3U8 下载', description: '下载 M3U8 格式的视频流', category: '媒体', component: M3u8Downloader },
+  { id: 'qrcode-decoder', backendName: 'qrcode-decode', name: '二维码识别', description: '上传二维码图片识别其中的内容', category: '媒体', component: QrCodeDecoder },
 ]
 
 /** 按分类分组，保持 CATEGORIES 顺序 */
