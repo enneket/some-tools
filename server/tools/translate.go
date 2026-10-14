@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // LangAuto 表示自动检测源语言
@@ -20,6 +21,10 @@ const (
 	defaultGoogleTranslateEndpoint = "https://translate.googleapis.com/translate_a/single"
 	maxTranslateResponse           = 1 << 20
 	translateRequestTimeout        = 30 * time.Second
+	// 单次请求接受的待翻译字数上限。降级路径每 myMemoryChunkRunes 字切一片、
+	// 每片失败还会重试一次，不设上限时一个请求体上限内的文本能放大成数千次
+	// 上游请求，把本服务变成对第三方免费额度的放大器。
+	maxTranslateInputRunes = 5000
 )
 
 // googleTranslateEndpoint 可用环境变量覆盖，便于接入自建代理，
@@ -202,6 +207,11 @@ func HandleTranslate(w http.ResponseWriter, r *http.Request) {
 	req.Input = strings.TrimSpace(req.Input)
 	if req.Input == "" {
 		writeTranslateError(w, http.StatusBadRequest, "请输入要翻译的文本")
+		return
+	}
+	if runes := utf8.RuneCountInString(req.Input); runes > maxTranslateInputRunes {
+		writeTranslateError(w, http.StatusBadRequest, fmt.Sprintf(
+			"待翻译文本 %d 字，超过 %d 字上限，请分段翻译", runes, maxTranslateInputRunes))
 		return
 	}
 	if req.From == "" {

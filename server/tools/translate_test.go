@@ -1,6 +1,12 @@
 package tools
 
-import "testing"
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+)
 
 func TestParseTranslateResponse(t *testing.T) {
 	cases := []struct {
@@ -90,5 +96,55 @@ func TestIsSupportedLanguage(t *testing.T) {
 		if got := isSupportedLanguage(c.code); got != c.want {
 			t.Errorf("isSupportedLanguage(%q) = %v, want %v", c.code, got, c.want)
 		}
+	}
+}
+
+// 打桩主服务，返回合法的翻译响应结构，并记录收到的请求次数
+func newStubGoogle(t *testing.T, requests *int) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*requests++
+		json.NewEncoder(w).Encode([]any{[]any{[]any{"[T]"}}, nil, "en"})
+	}))
+	t.Cleanup(server.Close)
+	t.Setenv("GOOGLE_TRANSLATE_ENDPOINT", server.URL)
+}
+
+func postTranslate(t *testing.T, input string) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(map[string]string{"input": input, "from": "auto", "to": "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	HandleTranslate(recorder, httptest.NewRequest(http.MethodPost, "/api/translate", strings.NewReader(string(body))))
+	return recorder
+}
+
+// 降级路径每 450 字切一片、每片失败重试一次，不设上限时一个请求能放大成
+// 数千次上游请求。这里确认超长文本在发出任何上游请求前就被挡下。
+func TestHandleTranslateRejectsOverlongInput(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  int
+	}{
+		{name: "one-over-limit", input: strings.Repeat("a", maxTranslateInputRunes+1), want: http.StatusBadRequest},
+		{name: "way-over-limit", input: strings.Repeat("a", 1<<20), want: http.StatusBadRequest},
+		{name: "at-limit", input: strings.Repeat("a", maxTranslateInputRunes), want: http.StatusOK},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var requests int
+			newStubGoogle(t, &requests)
+			recorder := postTranslate(t, c.input)
+			if recorder.Code != c.want {
+				t.Errorf("输入 %d 字，状态码 %d，期望 %d，响应 %s",
+					len(c.input), recorder.Code, c.want, recorder.Body.String())
+			}
+			if c.want == http.StatusBadRequest && requests != 0 {
+				t.Errorf("超长输入仍发起了 %d 次上游请求", requests)
+			}
+		})
 	}
 }
