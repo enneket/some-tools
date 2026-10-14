@@ -26,9 +26,14 @@ func HandleTimestamp(w http.ResponseWriter, r *http.Request) {
 
 	loc := time.Local
 	if req.Timezone != "" {
-		if l, err := time.LoadLocation(req.Timezone); err == nil {
-			loc = l
+		loaded, err := time.LoadLocation(req.Timezone)
+		if err != nil {
+			// 静默回落到服务器本地时区会让用户拿到"纽约时间"却是北京时间的结果，
+			// 且无从察觉，直接报错让调用方看到原因。
+			http.Error(w, "Invalid timezone: "+req.Timezone, http.StatusBadRequest)
+			return
 		}
+		loc = loaded
 	}
 
 	switch req.To {
