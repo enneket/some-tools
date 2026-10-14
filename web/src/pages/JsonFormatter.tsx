@@ -32,7 +32,7 @@ function preprocessJson(raw: string): string {
   )
 }
 
-function parseLenient(raw: string): unknown {
+export function parseLenient(raw: string): unknown {
   const trimmed = raw.trim()
   if (!trimmed) throw new Error('请输入 JSON')
   try {

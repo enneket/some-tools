@@ -10,7 +10,7 @@ const BASES = [
 
 // parseInt 遇到当前进制里的非法数字会静默截断（parseInt('08', 8) === 0），
 // 所以解析后要把值转回原进制跟输入比对，确认整串都被消费掉了。
-function parseBase(input: string, fromBase: number): number | null {
+export function parseBase(input: string, fromBase: number): number | null {
   const clean = input.replace(/^(0x|0o|0b)/i, '').trim()
   const num = parseInt(clean, fromBase)
   if (isNaN(num) || num < 0) return null
@@ -20,7 +20,7 @@ function parseBase(input: string, fromBase: number): number | null {
   return num
 }
 
-function convertAll(input: string, fromBase: number): Record<number, string> {
+export function convertAll(input: string, fromBase: number): Record<number, string> {
   const result: Record<number, string> = {}
   const num = parseBase(input, fromBase)
   if (num === null) {

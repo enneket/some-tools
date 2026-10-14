@@ -23,7 +23,7 @@ function parseCronField(field: string, min: number, names?: string[]): string {
   return names ? names[parseInt(field)] || field : field
 }
 
-function describeCron(expr: string): string {
+export function describeCron(expr: string): string {
   const parts = expr.trim().split(/\s+/)
   if (parts.length !== 5) return '需要 5 个字段：分 时 日 月 周'
 
@@ -40,7 +40,7 @@ function describeCron(expr: string): string {
   return desc.reverse().join('，')
 }
 
-function getNextRuns(expr: string, count: number): Date[] {
+export function getNextRuns(expr: string, count: number): Date[] {
   const parts = expr.trim().split(/\s+/)
   if (parts.length !== 5) return []
 
