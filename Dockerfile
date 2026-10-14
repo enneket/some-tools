@@ -1,11 +1,11 @@
 # Stage 1: Build frontend
 FROM node:20-alpine AS frontend
 WORKDIR /app
-COPY web/package.json web/tsconfig.json web/vite.config.ts ./
+COPY web/package.json web/package-lock.json web/tsconfig.json web/vite.config.ts ./
 COPY web/public ./public
 COPY web/src ./src
 COPY web/index.html ./
-RUN npm install && npm run build
+RUN npm ci && npm run build
 
 # Stage 2: Build Go server
 FROM golang:1.22-alpine AS builder
