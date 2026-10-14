@@ -8,34 +8,36 @@ const BASES = [
   { key: 16, label: '十六进制', prefix: '0x' },
 ]
 
+// parseInt 遇到当前进制里的非法数字会静默截断（parseInt('08', 8) === 0），
+// 所以解析后要把值转回原进制跟输入比对，确认整串都被消费掉了。
+function parseBase(input: string, fromBase: number): number | null {
+  const clean = input.replace(/^(0x|0o|0b)/i, '').trim()
+  const num = parseInt(clean, fromBase)
+  if (isNaN(num) || num < 0) return null
+  const stripLeadingZeros = (value: string) => value.replace(/^0+(?=.)/, '')
+  const roundTrip = stripLeadingZeros(num.toString(fromBase).toUpperCase())
+  if (roundTrip !== stripLeadingZeros(clean.toUpperCase())) return null
+  return num
+}
+
 function convertAll(input: string, fromBase: number): Record<number, string> {
   const result: Record<number, string> = {}
-  try {
-    const clean = input.replace(/^(0x|0o|0b)/i, '').trim()
-    const num = parseInt(clean, fromBase)
-    if (isNaN(num)) {
-      for (const b of BASES) result[b.key] = '无效输入'
-      return result
-    }
-    for (const b of BASES) {
-      result[b.key] = b.prefix + num.toString(b.key).toUpperCase()
-    }
-  } catch {
+  const num = parseBase(input, fromBase)
+  if (num === null) {
     for (const b of BASES) result[b.key] = '无效输入'
+    return result
+  }
+  for (const b of BASES) {
+    result[b.key] = b.prefix + num.toString(b.key).toUpperCase()
   }
   return result
 }
 
 function getBitDisplay(input: string, fromBase: number): string {
-  try {
-    const clean = input.replace(/^(0x|0o|0b)/i, '').trim()
-    const num = parseInt(clean, fromBase)
-    if (isNaN(num) || num < 0) return ''
-    return num.toString(2).padStart(Math.ceil(num.toString(2).length / 8) * 8, '0')
-      .match(/.{1,8}/g)?.join(' ') || ''
-  } catch {
-    return ''
-  }
+  const num = parseBase(input, fromBase)
+  if (num === null) return ''
+  return num.toString(2).padStart(Math.ceil(num.toString(2).length / 8) * 8, '0')
+    .match(/.{1,8}/g)?.join(' ') || ''
 }
 
 export default function BaseConverter() {
