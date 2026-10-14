@@ -6,14 +6,30 @@ const INITIAL_DEPTH = 2
 const MAX_EXPAND_DEPTH = 5
 const MAX_INPUT_SIZE = 5 * 1024 * 1024 // 5 MB
 
-function preprocessJson(raw: string): string {
-  let s = raw
-  s = s.replace(/\/\/.*$/gm, '')
-  s = s.replace(/\/\*[\s\S]*?\*\//g, '')
-  s = s.replace(/,\s*([}\]])/g, '$1')
-  s = s.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, inner) => `"${inner.replace(/\\'/g, "'").replace(/\\"/g, '"')}"`)
-  s = s.replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":')
+const DOUBLE_QUOTED = /("(?:[^"\\]|\\.)*")/g
+
+// split 的捕获组让结果在「字符串外 / 字符串内」之间交替，奇数下标是字符串本身。
+function mapOutsideStrings(s: string, transform: (chunk: string) => string): string {
   return s
+    .split(DOUBLE_QUOTED)
+    .map((chunk, index) => (index % 2 === 1 ? chunk : transform(chunk)))
+    .join('')
+}
+
+function preprocessJson(raw: string): string {
+  // 每一步都只在字符串字面量之外做替换：整段正则处理会把 URL 里的 //
+  // 当成注释吃掉，把引号内的 /* 当成注释，把 '...' 的内容当成键值改写，
+  // 结果是本来能解析的输入反而解析失败。顺序上先把单引号转成双引号，
+  // 后面两步才能把单引号字符串也当作字符串保护起来。
+  let s = mapOutsideStrings(raw, (chunk) =>
+    chunk.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_, inner) => `"${inner.replace(/\\'/g, "'").replace(/\\"/g, '"')}"`)
+  )
+  s = mapOutsideStrings(s, (chunk) =>
+    chunk.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '')
+  )
+  return mapOutsideStrings(s, (chunk) =>
+    chunk.replace(/,\s*([}\]])/g, '$1').replace(/([{,]\s*)([a-zA-Z_]\w*)\s*:/g, '$1"$2":')
+  )
 }
 
 function parseLenient(raw: string): unknown {
