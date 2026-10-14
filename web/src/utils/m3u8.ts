@@ -70,17 +70,17 @@ export async function parseM3u8(url: string): Promise<M3u8Playlist> {
   }
 
   const firstSegmentWithKey = manifest.segments.find((s) => s.key)
-  const firstSegmentIndex = firstSegmentWithKey
-    ? manifest.segments.indexOf(firstSegmentWithKey)
-    : 0
   const mediaSequence = ((manifest as unknown) as Record<string, unknown>).mediaSequence as number | undefined ?? 0
   const encryption = firstSegmentWithKey?.key
     ? {
         method: (firstSegmentWithKey.key.method as 'AES-128' | 'NONE') || 'AES-128',
         uri: new URL(firstSegmentWithKey.key.uri, url).href,
+        // 只有播放列表显式声明了 IV 才固定下来。没有显式 IV 时 HLS 规定每个
+        // 分片用各自的媒体序号作 IV，这里必须留空，让下载循环里的兜底生效；
+        // 否则整条流会用第一片的 IV 去解后面所有分片，解出乱码。
         iv: firstSegmentWithKey.key.iv
           ? hexToArrayBuffer(firstSegmentWithKey.key.iv)
-          : createMediaSequenceIV(mediaSequence + firstSegmentIndex),
+          : undefined,
       }
     : undefined
 
