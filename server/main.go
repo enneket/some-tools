@@ -20,6 +20,8 @@ import (
 const (
 	maxRequestBodyBytes = 1 << 20
 	shutdownTimeout     = 10 * time.Second
+	readHeaderTimeout   = 10 * time.Second
+	idleTimeout         = 60 * time.Second
 )
 
 var toolCatalog = []map[string]interface{}{
@@ -127,7 +129,13 @@ func main() {
 		port = "8080"
 	}
 
-	server := &http.Server{Addr: ":" + port}
+	// 不设 WriteTimeout：一次翻译会串行请求上游多次，耗时可达分钟级，
+	// 写超时会把正常的慢请求拦腰截断。上游单次请求已有 30 秒超时兜底。
+	server := &http.Server{
+		Addr:              ":" + port,
+		ReadHeaderTimeout: readHeaderTimeout,
+		IdleTimeout:       idleTimeout,
+	}
 
 	shutdownRequested := make(chan os.Signal, 1)
 	signal.Notify(shutdownRequested, os.Interrupt, syscall.SIGTERM)
