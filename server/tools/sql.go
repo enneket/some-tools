@@ -1155,9 +1155,15 @@ func detectClause(s string) string {
 	for _, kw := range []string{"SELECT", "FROM", "WHERE", "ORDER BY", "GROUP BY",
 		"HAVING", "LIMIT", "OFFSET", "UNION", "INSERT INTO", "VALUES",
 		"UPDATE", "SET", "DELETE FROM", "WITH"} {
-		if strings.HasPrefix(upper, kw) {
-			return kw
+		if !strings.HasPrefix(upper, kw) {
+			continue
 		}
+		// 关键字后紧跟字母、数字或下划线说明这是更长的标识符而非子句，
+		// 例如 SELECT / SELECTION、SET / SETTINGS，否则 TrimPrefix 会砍掉字符。
+		if next := len(kw); next < len(upper) && isIdent(upper[next]) {
+			continue
+		}
+		return kw
 	}
 	return ""
 }

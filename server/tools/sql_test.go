@@ -293,6 +293,46 @@ func TestFormatSQLCore(t *testing.T) {
 	}
 }
 
+// 以关键字开头的更长标识符（SELECTION、SETTINGS）此前被 detectClause 当成子句，
+// TrimPrefix 砍掉前缀字母，SELECTION 被输出成 SELECT ION。
+func TestFormatSQLKeywordPrefixIsNotAClause(t *testing.T) {
+	cases := []struct {
+		name string
+		sql  string
+		want string
+	}{
+		{
+			name: "selection-as-column",
+			sql:  "SELECT selection FROM users",
+			want: "SELECT selection\nFROM users",
+		},
+		{
+			// 没有前导子句关键字，按未知首段原样输出；关键是标识符不再被砍字符。
+			name: "selection-uppercase-input",
+			sql:  "SELECTION, ID FROM USERS",
+			want: "  SELECTION, ID\nFROM USERS",
+		},
+		{
+			name: "settings-as-table",
+			sql:  "SELECT id FROM settings WHERE id=1",
+			want: "SELECT id\nFROM settings\nWHERE id = 1",
+		},
+		{
+			name: "setting-as-column-after-update",
+			sql:  "UPDATE settings SET name='x'",
+			want: "UPDATE settings\nSET name = 'x'",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := FormatSQL(c.sql)
+			if got != c.want {
+				t.Errorf("FormatSQL(%q)\n got: %q\nwant: %q", c.sql, got, c.want)
+			}
+		})
+	}
+}
+
 // 残缺输入（以关键字结尾、括号不配对、空串）此前会让 ensureKeywordSpacing
 // 的 searchFrom 越过字符串末尾而 panic。此处只断言不崩溃，不锁定具体输出。
 func TestFormatSQLNoPanic(t *testing.T) {
