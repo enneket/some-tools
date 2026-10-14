@@ -1,6 +1,6 @@
 # ToolHub - 开发者工具箱
 
-在线开发者工具集合，提供 JSON 格式化、Base64 编解码、Hash 计算、SQL 格式化、AI 人像抠图等 26 种常用工具。首页支持拖拽排序、分类筛选和搜索。
+在线开发者工具集合，提供 JSON 格式化、Base64 编解码、Hash 计算、SQL 格式化等 25 种常用工具。首页支持拖拽排序、分类筛选和搜索。
 
 ## 首页特性
 
@@ -39,7 +39,6 @@
 | 二维码生成 | 文本或链接转二维码 | 前端 |
 | 图片转 Base64 | 将图片转换为 Base64 编码 | 前端 |
 | Base64 转图片 | 将 Base64 编码转换为图片显示 | 前端 |
-| 人像抠图 | 使用 AI 模型将人像从背景中分割出来 | 前端 |
 
 ### 转换器
 
@@ -72,7 +71,6 @@
 ## 技术栈
 
 - **前端**: React + TypeScript + Vite
-- **AI 能力**: MediaPipe (人像抠图)
 - **后端**: Go (net/http)
 - **部署**: Docker 多阶段构建的单容器
 
@@ -124,9 +122,9 @@ some-tools/
 │   ├── src/
 │   │   ├── components/      # 公共组件 (Header, ToolCard, ToolLayout, JsonTree)
 │   │   ├── data/tools.ts    # 工具清单：id / 名称 / 分类 / 组件，路由由它生成
-│   │   ├── pages/           # 工具页面 (26 个工具)
-│   │   └── utils/           # m3u8 解析下载、人像分割
-│   └── public/models/       # MediaPipe 模型文件
+│   │   ├── pages/           # 工具页面 (25 个工具)
+│   │   └── utils/           # m3u8 播放列表解析与下载
+│   └── public/             # favicon 等静态资源
 └── server/                  # Go 后端
     ├── main.go              # 路由注册、请求体上限、优雅退出
     └── tools/               # API handlers (12 个接口)

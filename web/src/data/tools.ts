@@ -23,7 +23,6 @@ import HttpStatusCodes from '../pages/HttpStatusCodes'
 import SqlFormatter from '../pages/SqlFormatter'
 import Translator from '../pages/Translator'
 import M3u8Downloader from '../pages/M3u8Downloader'
-import PortraitSegmenter from '../pages/PortraitSegmenter'
 import QrCodeDecoder from '../pages/QrCodeDecoder'
 
 export const CATEGORIES = ['编解码', '生成器', '转换器', '文本', '媒体']
@@ -52,7 +51,6 @@ export const TOOLS: ToolEntry[] = [
   { id: 'qrcode-generator', name: '二维码生成', description: '文本或链接转二维码', category: '生成器', component: QrCodeGenerator },
   { id: 'image-to-base64', name: '图片转 Base64', description: '将图片转换为 Base64 编码', category: '生成器', component: ImageToBase64 },
   { id: 'base64-to-image', name: 'Base64 转图片', description: '将 Base64 编码转换为图片显示', category: '生成器', component: Base64ToImage },
-  { id: 'portrait-segmenter', name: '人像抠图', description: '使用 AI 模型进行人像分割', category: '生成器', component: PortraitSegmenter },
   // 转换器
   { id: 'timestamp-converter', name: '时间戳转换', description: '时间戳与日期时间互转', category: '转换器', component: TimestampConverter },
   { id: 'color-converter', name: '颜色转换', description: 'HEX 与 RGB 颜色值互转', category: '转换器', component: ColorConverter },
