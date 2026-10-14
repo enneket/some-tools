@@ -1,9 +1,18 @@
 import { useState, useMemo } from 'react'
 import ToolLayout from '../components/ToolLayout'
 
-function diffLines(a: string, b: string) {
-  const linesA = a.split('\n')
-  const linesB = b.split('\n')
+// 行尾那个换行是行终止符，不是多出来的一行：'abc\n' 切出来是 ['abc','']，
+// 与 'abc' 逐项比较会在末尾多出一条空的删除行。只去掉一个结尾换行，
+// 'a\n\n' 里那个真正的空行仍会被保留。空文本则是一行都没有，
+// 否则 '' 会被当成一个空行，凭空多出一条增删。
+function splitLines(text: string): string[] {
+  const stripped = text.replace(/\n$/, '')
+  return stripped === '' ? [] : stripped.split('\n')
+}
+
+export function diffLines(a: string, b: string) {
+  const linesA = splitLines(a)
+  const linesB = splitLines(b)
   const result: { type: 'same' | 'add' | 'remove'; line: string }[] = []
   const max = Math.max(linesA.length, linesB.length)
   for (let i = 0; i < max; i++) {
