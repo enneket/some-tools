@@ -37,6 +37,9 @@ export interface DownloadState {
   speed?: number
 }
 
+// 分片并发下载数。太高会给源站和浏览器内存都带来压力，6 路对常见 CDN 已足够。
+const maxConcurrentDownloads = 6
+
 function hexToArrayBuffer(hex: string): ArrayBuffer {
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {
@@ -168,34 +171,46 @@ export async function downloadM3u8(
       encryptionKey = await keyResponse.arrayBuffer()
     }
 
-    const segments: ArrayBuffer[] = []
+    // 下载阶段开一个滑动窗口并发拉取：串行逐片 await 时，200 片的播放列表在
+    // 80ms 延迟下要等约 16 秒，并发 6 路只要 1.5 秒左右。
+    const downloaded: ArrayBuffer[] = new Array(totalSegments)
     const startTime = Date.now()
+    let nextToStart = 0
+    let completed = 0
 
+    const fetchOne = async (): Promise<void> => {
+      // 每个 worker 循环取号直到取完，滑动窗口由此形成
+      while (true) {
+        const index = nextToStart++
+        if (index >= totalSegments) return
+        downloaded[index] = await downloadSegment(playlist.segments[index].uri)
+        completed++
+        const elapsed = (Date.now() - startTime) / 1000
+        updateState({
+          status: 'downloading',
+          currentSegment: completed,
+          progress: (completed / totalSegments) * 100,
+          // 首个分片在本地可能几毫秒就返回，除数为 0 时会算出 Infinity
+          speed: completed / Math.max(elapsed, 0.001),
+        })
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(maxConcurrentDownloads, totalSegments) }, fetchOne)
+    )
+
+    // 按序号解密，边解边释放原始分片，避免加密流同时驻留两份完整数据
+    const segments: ArrayBuffer[] = []
     for (let i = 0; i < totalSegments; i++) {
-      const segmentData = await downloadSegment(playlist.segments[i].uri)
-
+      let data = downloaded[i]
       if (playlist.encryption?.method === 'AES-128' && encryptionKey) {
         updateState({ status: 'decrypting' })
         const iv = playlist.encryption.iv ?? createMediaSequenceIV(playlist.segments[i].mediaSequence)
-        const decrypted = await decryptSegment(
-          segmentData,
-          encryptionKey,
-          iv
-        )
-        segments.push(decrypted)
-      } else {
-        segments.push(segmentData)
+        data = await decryptSegment(data, encryptionKey, iv)
+        downloaded[i] = new ArrayBuffer(0)
       }
-
-      const elapsed = (Date.now() - startTime) / 1000
-      const speed = (i + 1) / elapsed
-
-      updateState({
-        status: 'downloading',
-        currentSegment: i + 1,
-        progress: ((i + 1) / totalSegments) * 100,
-        speed,
-      })
+      segments.push(data)
     }
 
     updateState({ status: 'merging' })
