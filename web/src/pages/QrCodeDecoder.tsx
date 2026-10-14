@@ -50,6 +50,7 @@ export default function QrCodeDecoder() {
   const [copied, setCopied] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const objectUrlRef = useRef<string | null>(null)
+  const latestRequestRef = useRef(0)
 
   useEffect(() => {
     return () => {
@@ -75,8 +76,14 @@ export default function QrCodeDecoder() {
     const dataUrl = URL.createObjectURL(file)
     objectUrlRef.current = dataUrl
 
+    // 大图解码比小图慢，先贴大图再贴小图时大图的 onload 可能后到。
+    // 记录请求序号，晚到的回调直接丢弃，否则会用已失效的 object URL 覆盖结果。
+    const requestId = latestRequestRef.current + 1
+    latestRequestRef.current = requestId
+
     const img = new Image()
     img.onload = () => {
+      if (requestId !== latestRequestRef.current) return
       const content = decodeImage(img)
       if (content === null) {
         setError('未识别到二维码，请确认图片清晰且二维码完整')
@@ -92,7 +99,10 @@ export default function QrCodeDecoder() {
         content,
       })
     }
-    img.onerror = () => setError('图片解析失败，请更换文件重试')
+    img.onerror = () => {
+      if (requestId !== latestRequestRef.current) return
+      setError('图片解析失败，请更换文件重试')
+    }
     img.src = dataUrl
   }, [])
 

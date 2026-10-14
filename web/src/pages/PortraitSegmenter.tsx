@@ -16,12 +16,24 @@ export default function PortraitSegmenter() {
   const [result, setResult] = useState<ImageData | null>(null)
   const [state, setState] = useState<ProcessingState>({ status: 'idle' })
   const fileRef = useRef<HTMLInputElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     return () => {
       resetSegmenter()
     }
   }, [])
+
+  // 内联 ref 回调每次渲染都是新函数，React 会在每次渲染重新执行一遍整幅
+  // putImageData，大图上会明显卡顿。改为只在结果变化时画一次。
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !result) return
+    canvas.width = result.width
+    canvas.height = result.height
+    const ctx = canvas.getContext('2d')
+    if (ctx) ctx.putImageData(result, 0, 0)
+  }, [result])
 
   const handleFile = (file: File) => {
     if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
@@ -168,16 +180,7 @@ export default function PortraitSegmenter() {
             </h3>
             {result ? (
               <canvas
-                ref={(canvas) => {
-                  if (canvas && result) {
-                    canvas.width = result.width
-                    canvas.height = result.height
-                    const ctx = canvas.getContext('2d')
-                    if (ctx) {
-                      ctx.putImageData(result, 0, 0)
-                    }
-                  }
-                }}
+                ref={canvasRef}
                 style={{
                   width: '100%',
                   borderRadius: '8px',
