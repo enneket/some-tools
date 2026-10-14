@@ -2,6 +2,8 @@ import { useState } from 'react'
 import ToolLayout from '../components/ToolLayout'
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+// cron 用 7 表示星期日，补一位到表尾，查表时 7 与 getDay() 的 0 就一致了。
+const WEEKDAY_NAMES = [...WEEKDAYS, WEEKDAYS[0]]
 const MONTHS = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月']
 
 function parseCronField(field: string, min: number, names?: string[]): string {
@@ -28,7 +30,7 @@ function describeCron(expr: string): string {
   const [min, hour, day, month, weekday] = parts
   const desc: string[] = []
 
-  if (weekday !== '*') desc.push(`在 ${parseCronField(weekday, 0, WEEKDAYS)}`)
+  if (weekday !== '*') desc.push(`在 ${parseCronField(weekday, 0, WEEKDAY_NAMES)}`)
   if (month !== '*') desc.push(`${parseCronField(month, 1, MONTHS)}`)
   if (day !== '*') desc.push(`${parseCronField(day, 1)} 号`)
   if (hour !== '*') desc.push(`${parseCronField(hour, 0)} 时`)
@@ -63,6 +65,26 @@ function getNextRuns(expr: string, count: number): Date[] {
     return val === parseInt(expr)
   }
 
+  // 星期字段单独按集合判断：cron 的 7 表示星期日，而 getDay() 的星期日是 0，
+  // 区间右端点写 7（1-7，常见的"每天"）也要算进星期日。字段取值范围只有
+  // 0-7，直接展开即可，不必像 matches 那样逐类分支。
+  const weekdayValues = new Set<number>()
+  for (const part of weekdayExpr.split(',')) {
+    const range = part.match(/^(\d+)-(\d+)$/)
+    if (range) {
+      for (let day = Number(range[1]); day <= Number(range[2]); day++) {
+        weekdayValues.add(day === 7 ? 0 : day)
+      }
+      continue
+    }
+    const day = parseInt(part)
+    if (!isNaN(day)) weekdayValues.add(day === 7 ? 0 : day)
+  }
+  const matchesWeekday =
+    weekdayExpr === '*' || weekdayExpr.includes('/')
+      ? (val: number) => matches(val, weekdayExpr)
+      : (val: number) => weekdayValues.has(val)
+
   const d = new Date(now)
   d.setSeconds(0)
   d.setMilliseconds(0)
@@ -74,7 +96,7 @@ function getNextRuns(expr: string, count: number): Date[] {
       matches(d.getHours(), hourExpr) &&
       matches(d.getDate(), dayExpr) &&
       matches(d.getMonth() + 1, monthExpr) &&
-      matches(d.getDay(), weekdayExpr)
+      matchesWeekday(d.getDay())
     ) {
       results.push(new Date(d))
     }
