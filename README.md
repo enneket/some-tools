@@ -92,7 +92,7 @@ docker compose up -d
 
 ```bash
 cd web
-npm install
+npm ci        # 用 lockfile 锁定版本，与 Docker 构建保持一致
 npm run dev
 ```
 
@@ -103,39 +103,52 @@ cd server
 go run main.go
 ```
 
+前端开发服务器在 `3000` 端口，并把 `/api` 代理到 `http://api:8080`（见 `web/vite.config.ts`）。脱离 Docker 时需要把该地址改成本机后端地址，或直接访问后端的 8080 端口。
+
+## 测试
+
+```bash
+cd server && go test ./...   # Go 后端
+cd web && npm test           # 前端（vitest）
+```
+
+Go 侧覆盖 SQL 格式化、翻译、语种检测、颜色、时间戳，以及 JSON/Base64/URL/UUID/JWT/Hash/密码生成这几个接口。前端只覆盖纯函数（JSON 宽松解析、进制转换、Cron 匹配、文本对比），UI 组件目前没有测试。
+
 ## 项目结构
 
 ```
 some-tools/
 ├── docker-compose.yml
-├── Dockerfile
-├── web/                  # React 前端
+├── Dockerfile               # 多阶段构建：前端 → Go → 单容器
+├── web/                     # React 前端
 │   ├── src/
-│   │   ├── components/   # 公共组件 (Header, ToolCard, ToolLayout)
-│   │   └── pages/        # 工具页面 (26 个工具)
-│   └── public/
-└── server/               # Go 后端
-    ├── main.go
-    └── tools/            # API handlers (12 个接口)
+│   │   ├── components/      # 公共组件 (Header, ToolCard, ToolLayout, JsonTree)
+│   │   ├── data/tools.ts    # 工具清单：id / 名称 / 分类 / 组件，路由由它生成
+│   │   ├── pages/           # 工具页面 (26 个工具)
+│   │   └── utils/           # m3u8 解析下载、人像分割
+│   └── public/models/       # MediaPipe 模型文件
+└── server/                  # Go 后端
+    ├── main.go              # 路由注册、请求体上限、优雅退出
+    └── tools/               # API handlers (12 个接口)
 ```
 
 ## API 接口
 
-所有 API 均为 POST 请求，Content-Type: application/json。
+除 `/api/translate/languages` 外，所有 API 均为 POST 请求，Content-Type: application/json。响应是 JSON，绝大多数接口为 `{"output": "..."}`（`/api/translate` 额外带 `detected`，`/api/jwt/decode` 的 `output` 是含 header/payload/signature 的对象）；出错时返回非 2xx 状态码与纯文本说明。
 
 | 端点 | 参数 | 说明 |
 |------|------|------|
-| `/api/format/json` | `{input}` | JSON 格式化 |
-| `/api/encode/base64` | `{input, mode}` | Base64 编解码 |
-| `/api/encode/url` | `{input, mode}` | URL 编解码 |
-| `/api/generate/uuid` | `{count}` | 生成 UUID |
-| `/api/convert/timestamp` | `{input, to}` | 时间戳转换 |
-| `/api/convert/color` | `{input, from, to}` | 颜色转换（`from`/`to` 取 `hex` 或 `rgb`） |
-| `/api/hash` | `{input, alg}` | Hash 计算 |
-| `/api/jwt/decode` | `{input}` | JWT 解析 |
-| `/api/password/generate` | `{length, upper, digits, symbols}` | 密码生成 |
-| `/api/format/sql` | `{input}` | SQL 格式化 |
-| `/api/translate` | `{input, from, to}` | 文本翻译（`from` 传 `auto` 自动检测源语言） |
+| `/api/format/json` | `{input}` | JSON 格式化（前端未调用，JSON 工具在浏览器内完成） |
+| `/api/encode/base64` | `{input, action}` | Base64 编解码，`action` 取 `encode` 或 `decode` |
+| `/api/encode/url` | `{input, action}` | URL 编解码，`action` 取 `encode` 或 `decode` |
+| `/api/generate/uuid` | 无 | 生成一个随机 UUID（v4） |
+| `/api/convert/timestamp` | `{input, to, timezone}` | 时间戳转换，`to` 取 `date` 或 `timestamp`，`timezone` 为 IANA 时区名，留空用服务器本地时区 |
+| `/api/convert/color` | `{input, from, to}` | 颜色转换，`from`/`to` 取 `hex` 或 `rgb`；rgb 分量必须在 0-255 |
+| `/api/hash` | `{input, alg}` | Hash 计算，`alg` 取 `md5`/`sha1`/`sha256`/`sha512`/`all` |
+| `/api/jwt/decode` | `{input}` | JWT 解析（仅解码，不校验签名） |
+| `/api/password/generate` | `{length, upper, digits, symbols}` | 密码生成；`length` 缺省或非正数取 16，超过 128 按 128 截断 |
+| `/api/format/sql` | `{sql}` 或 `{input}` | SQL 格式化，两者同时给出时以 `sql` 为准 |
+| `/api/translate` | `{input, from, to}` | 文本翻译，`from` 传 `auto` 自动检测源语言，待翻译文本不超过 5000 字 |
 | `/api/translate/languages` | 无（GET） | 返回支持的语言清单 |
 
 ## 翻译服务
@@ -146,6 +159,8 @@ some-tools/
 2. **MyMemory**（官方免费）— 主服务失败时降级使用
 
 MyMemory 不接受 `Autodetect` 作为源语言，降级时会先在本地判断语种（先看文字系统，再看变音符号，最后统计虚词）。判断不出来时接口返回 502 并提示手动指定源语言，而不是猜一个。该服务单次请求上限为 500 字符，超长文本会自动按句号、标点、空格依次切分后分段翻译再拼接。
+
+单次 `/api/translate` 请求的待翻译文本上限为 5000 字（按字符计），超出返回 400。降级路径每 450 字切一片且每片失败会重试一次，不设这个上限的话一个请求能放大成数千次上游请求，把本服务变成对第三方免费额度的放大器。
 
 | 环境变量 | 默认值 | 说明 |
 |---|---|---|
