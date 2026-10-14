@@ -164,18 +164,18 @@ func TestFormatSQLCore(t *testing.T) {
 		{
 			name: "subquery-in-where-in",
 			sql:  "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders)",
-			want: "SELECT *\nFROM users\nWHERE id IN ( SELECT user_id FROM orders)",
+			want: "SELECT *\nFROM users\nWHERE id IN (SELECT user_id FROM orders)",
 		},
 		{
 			name: "subquery-in-where-in-with-condition",
 			sql:  "SELECT * FROM users WHERE id IN (SELECT user_id FROM orders WHERE status=1)",
-			want: "SELECT *\nFROM users\nWHERE id IN ( SELECT user_id FROM orders WHERE status = 1)",
+			want: "SELECT *\nFROM users\nWHERE id IN (SELECT user_id FROM orders WHERE status = 1)",
 		},
 		// Subquery in WHERE clause (EXISTS)
 		{
 			name: "subquery-in-where-exists",
 			sql:  "SELECT * FROM users WHERE EXISTS (SELECT 1 FROM orders WHERE orders.user_id=users.id)",
-			want: "SELECT *\nFROM users\nWHERE EXISTS ( SELECT 1 FROM orders WHERE orders.user_id = users.id)",
+			want: "SELECT *\nFROM users\nWHERE EXISTS (SELECT 1 FROM orders WHERE orders.user_id = users.id)",
 		},
 		// Table alias (no AS keyword)
 		{
@@ -333,8 +333,8 @@ func TestFormatSQLKeywordPrefixIsNotAClause(t *testing.T) {
 	}
 }
 
-// 残缺输入（以关键字结尾、括号不配对、空串）此前会让 ensureKeywordSpacing
-// 的 searchFrom 越过字符串末尾而 panic。此处只断言不崩溃，不锁定具体输出。
+// 残缺输入（以关键字结尾、括号不配对、空串）此前会让关键字补空格那一步的
+// searchFrom 越过字符串末尾而 panic。此处只断言不崩溃，不锁定具体输出。
 func TestFormatSQLNoPanic(t *testing.T) {
 	inputs := []string{
 		"", "   ", "SELECT", "FROM", "a OR", "SELECT 1 UNION",

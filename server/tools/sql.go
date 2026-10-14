@@ -37,8 +37,6 @@ func FormatSQL(sql string) string {
 	// Collapse whitespace: actual runs of \t \r \n and literal escape
 	// sequences such as "\n" / "\t" outside of strings all become one space.
 	s = normalizeWhitespace(s)
-	// Ensure space before SQL keywords to prevent token concatenation
-	s = ensureKeywordSpacing(s)
 	s = upperCaseKeywords(s)
 	// Run the structural formatting on everything except placeholders, then
 	// put the string literals back verbatim.
@@ -161,35 +159,6 @@ func restoreLiterals(s string, literals []string) string {
 		i++
 	}
 	return b.String()
-}
-
-// ensureKeywordSpacing adds space before SQL keywords if missing to prevent token concatenation
-func ensureKeywordSpacing(s string) string {
-	keywords := []string{"SELECT", "FROM", "WHERE", "AND", "OR", "JOIN", "ON", "GROUP BY", "ORDER BY", "LIMIT", "OFFSET", "INNER", "LEFT", "RIGHT", "CROSS", "FULL", "OUTER", "HAVING", "UNION", "AS", "CASE", "WHEN", "THEN", "ELSE", "END", "IN", "NOT", "IS", "NULL", "EXISTS", "BETWEEN", "LIKE"}
-
-	result := s
-	for _, kw := range keywords {
-		searchFrom := 0
-		for {
-			pos := strings.Index(result[searchFrom:], kw)
-			if pos < 0 {
-				break
-			}
-			realIdx := searchFrom + pos
-			if realIdx > 0 && result[realIdx-1] != ' ' {
-				prevChar := result[realIdx-1]
-				if prevChar == '_' || (prevChar >= 'a' && prevChar <= 'z') || (prevChar >= 'A' && prevChar <= 'Z') || (prevChar >= '0' && prevChar <= '9') {
-					searchFrom = realIdx + 1
-					continue
-				}
-				result = result[:realIdx] + " " + result[realIdx:]
-				searchFrom = realIdx + len(kw) + 1
-			} else {
-				searchFrom = realIdx + len(kw)
-			}
-		}
-	}
-	return result
 }
 
 var keywords = []string{
