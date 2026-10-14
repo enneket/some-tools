@@ -58,13 +58,17 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function HttpStatusCodes() {
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState<string | null>(null)
   const [selected, setSelected] = useState<StatusCode | null>(null)
 
+  // 分类单独用一个 state：分类名里的 "4xx" 不是任何一条记录的 code/name/description，
+  // 塞进搜索框会过滤出空列表。
   const filtered = CODES.filter(c =>
-    search === '' ||
-    c.code.toString().includes(search) ||
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.description.includes(search)
+    (!category || c.category === category) &&
+    (search === '' ||
+      c.code.toString().includes(search) ||
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.description.includes(search))
   )
 
   const categories = [...new Set(CODES.map(c => c.category))]
@@ -85,14 +89,15 @@ export default function HttpStatusCodes() {
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
         {categories.map(cat => (
-          <button key={cat} onClick={() => setSearch(cat.split(' ')[0])} style={{
+          <button key={cat} onClick={() => setCategory(category === cat ? null : cat)} style={{
             padding: '4px 12px', border: 'none', borderRadius: '16px',
-            background: CATEGORY_COLORS[cat] + '20', color: CATEGORY_COLORS[cat],
+            background: CATEGORY_COLORS[cat] + (category === cat ? 'ff' : '20'),
+            color: CATEGORY_COLORS[cat],
             cursor: 'pointer', fontSize: '13px', fontWeight: 600,
           }}>{cat}</button>
         ))}
-        {search && (
-          <button onClick={() => setSearch('')} style={{
+        {(search || category) && (
+          <button onClick={() => { setSearch(''); setCategory(null) }} style={{
             padding: '4px 12px', border: '1px solid #e5e5e5', borderRadius: '16px',
             background: '#fff', cursor: 'pointer', fontSize: '13px',
           }}>清除筛选</button>
