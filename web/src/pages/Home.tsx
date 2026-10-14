@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -15,7 +15,7 @@ import {
 } from '@dnd-kit/sortable'
 import Header from '../components/Header'
 import ToolCard from '../components/ToolCard'
-import { TOOLS, type ToolEntry } from '../data/tools'
+import { TOOLS } from '../data/tools'
 
 interface Tool {
   id: string
@@ -26,15 +26,30 @@ interface Tool {
 
 const CATEGORIES = ['全部', ...new Set(TOOLS.map(t => t.category))]
 
-const BY_BACKEND_NAME = new Map(TOOLS.map((t: ToolEntry) => [t.backendName, t]))
-
 const STORAGE_KEY = 'some-tools-order'
 
+function initialTools(): Tool[] {
+  const tools = TOOLS.map(({ id, name, description, category }) => ({
+    id,
+    name,
+    description,
+    category,
+  }))
+  const savedOrder = localStorage.getItem(STORAGE_KEY)
+  if (!savedOrder) return tools
+  try {
+    const orderMap: Record<string, number> = JSON.parse(savedOrder)
+    tools.sort((a, b) => (orderMap[a.id] ?? 9999) - (orderMap[b.id] ?? 9999))
+  } catch {
+    // 排序数据损坏时按默认顺序展示
+  }
+  return tools
+}
+
 export default function Home() {
-  const [tools, setTools] = useState<Tool[]>([])
+  const [tools, setTools] = useState<Tool[]>(initialTools)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('全部')
-  const [loadError, setLoadError] = useState('')
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -45,52 +60,6 @@ export default function Home() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   )
-
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/tools', { signal: AbortSignal.timeout(10000) })
-      .then(async (res) => {
-        if (!res.ok) {
-          throw new Error(await res.text() || `加载失败 (${res.status})`)
-        }
-        return res.json()
-      })
-      .then(data => {
-        if (cancelled) return
-        const mapped = (data.tools || []).map((t: { name: string; description: string }) => {
-          const meta = BY_BACKEND_NAME.get(t.name)
-          return {
-            id: meta?.id || t.name,
-            name: meta?.name || t.name,
-            description: meta?.description || t.description,
-            category: meta?.category || '其他',
-          }
-        })
-
-        // Load saved order from localStorage
-        const savedOrder = localStorage.getItem(STORAGE_KEY)
-        if (savedOrder) {
-          try {
-            const orderMap: Record<string, number> = JSON.parse(savedOrder)
-            mapped.sort((a: Tool, b: Tool) => {
-              const orderA = orderMap[a.id] ?? 9999
-              const orderB = orderMap[b.id] ?? 9999
-              return orderA - orderB
-            })
-          } catch {
-            // Ignore parse errors
-          }
-        }
-
-        setTools(mapped)
-      })
-      .catch(err => {
-        if (!cancelled) setLoadError(err.message || '加载工具列表失败')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const filtered = tools.filter(tool => {
     const matchSearch = tool.name.toLowerCase().includes(search.toLowerCase())
@@ -116,9 +85,6 @@ export default function Home() {
               borderRadius: '8px',
             }}
           />
-          {loadError && (
-            <div style={{ color: '#ef4444', fontSize: '14px', marginTop: '8px' }}>{loadError}</div>
-          )}
         </div>
         <div style={{ display: 'flex', gap: '12px', marginBottom: '32px', flexWrap: 'wrap' }}>
           {CATEGORIES.map(cat => (
