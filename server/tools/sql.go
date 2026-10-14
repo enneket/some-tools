@@ -914,49 +914,6 @@ func splitByClauseKeywords(s string) []string {
 	return splitByMultipleKeywords(s, kwMap)
 }
 
-// splitByKeyword splits on a keyword (respecting parentheses)
-func splitByKeyword(s string, kw string) []string {
-	var result []string
-	var current strings.Builder
-	depth := 0
-	i := 0
-	for i < len(s) {
-		// Always track parens depth to avoid splitting inside them
-		if s[i] == '(' {
-			depth++
-			current.WriteByte(s[i])
-			i++
-			continue
-		}
-		if s[i] == ')' {
-			depth--
-			current.WriteByte(s[i])
-			i++
-			continue
-		}
-		if depth == 0 && i+len(kw) <= len(s) && strings.HasPrefix(s[i:], kw) {
-			next := i + len(kw)
-			isBoundary := next >= len(s) || !isIdent(s[next])
-			isStart := i == 0 || !isIdent(s[i-1])
-			if isBoundary && isStart {
-				if current.Len() > 0 {
-					result = append(result, current.String())
-					current.Reset()
-				}
-				result = append(result, kw)
-				i += len(kw)
-				continue
-			}
-		}
-		current.WriteByte(s[i])
-		i++
-	}
-	if current.Len() > 0 {
-		result = append(result, current.String())
-	}
-	return result
-}
-
 func splitByMultipleKeywords(s string, kws []string) []string {
 	var result []string
 	var current strings.Builder
